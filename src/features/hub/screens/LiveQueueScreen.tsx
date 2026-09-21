@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, TextInput } from 'react-native';
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
-import { MockApi, getSlaStatus } from '../../../infrastructure/api/MockApi';
+import { ApiClient as MockApi, getSlaStatus } from '../../../infrastructure/api/ApiClient';
 import { Garment } from '../../../domain/models/types';
 import { SLAIndicator } from '../../../shared/components/SLAIndicator';
 

@@ -1,10 +1,24 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Platform, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../core/auth/AuthContext';
 import { useNavigation } from '@react-navigation/native';
+import { UserProfileModal } from '../../../shared/components/UserProfileModal';
 
 export const HubMoreScreen = () => {
   const { userName, role, logout } = useAuth();
+  const [showProfile, setShowProfile] = React.useState(false);
+
+  const confirmLogout = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to logout?')) logout();
+    } else {
+      Alert.alert('Logout', 'Are you sure you want to logout?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', onPress: logout, style: 'destructive' },
+      ]);
+    }
+  };
   const navigation = useNavigation<any>();
 
   return (
@@ -27,11 +41,17 @@ export const HubMoreScreen = () => {
           <MenuBtn label="🚚 Dispatch Station" onPress={() => navigation.navigate('QueueRoot', { stationId: 'dispatch' })} />
         </View>
 
-        <TouchableOpacity style={s.logoutBtn} onPress={logout}>
-          <Text style={s.logoutText}>LOGOUT</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+          <TouchableOpacity style={[s.logoutBtn, { flex: 1, backgroundColor: '#f1f5f9', borderColor: '#cbd5e1' }]} onPress={() => setShowProfile(true)}>
+            <Ionicons name="person-outline" size={24} color="#475569" style={s.logoutIcon} />
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.logoutBtn, { flex: 1 }]} onPress={confirmLogout}>
+            <Ionicons name="log-out-outline" size={24} color="#ef4444" style={s.logoutIcon} />
+          </TouchableOpacity>
+        </View>
 
       </ScrollView>
+      <UserProfileModal visible={showProfile} onClose={() => setShowProfile(false)} />
     </SafeAreaView>
   );
 };
@@ -59,6 +79,7 @@ const s = StyleSheet.create({
   menuText: { fontSize: 15, fontWeight: '700', color: '#1e293b' },
   menuArrow: { fontSize: 20, color: '#cbd5e1' },
 
-  logoutBtn: { backgroundColor: '#fef2f2', padding: 16, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#fecaca' },
+  logoutBtn: { backgroundColor: '#fef2f2', padding: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#fecaca', flexDirection: 'row' },
+  logoutIcon: { marginRight: 8 },
   logoutText: { color: '#ef4444', fontWeight: '800', fontSize: 14, letterSpacing: 1 },
 });

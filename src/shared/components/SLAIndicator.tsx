@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { MockApi } from '../../infrastructure/api/MockApi';
+import { ApiClient as MockApi } from '../../infrastructure/api/ApiClient';
 
 interface Props { slaDeadline?: string; compact?: boolean; }
 

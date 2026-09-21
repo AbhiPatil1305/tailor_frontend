@@ -1,6 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { AdminFinanceScreen } from '../screens/AdminFinanceScreen';
 import { useAuth } from '../../../core/auth/AuthContext';
 
@@ -29,6 +30,17 @@ const AdminOverviewTab = () => {
 
 const ProfileTab = () => {
   const { logout, userName } = useAuth();
+
+  const confirmLogout = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to logout?')) logout();
+    } else {
+      Alert.alert('Logout', 'Are you sure you want to logout?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', onPress: logout, style: 'destructive' },
+      ]);
+    }
+  };
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
       <ScrollView contentContainerStyle={{ padding: 24 }}>
@@ -37,8 +49,8 @@ const ProfileTab = () => {
           <Text style={{ color: '#fff', fontSize: 20, fontWeight: '900', marginBottom: 4 }}>{userName}</Text>
           <Text style={{ color: '#f59e0b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Finance Admin</Text>
         </View>
-        <TouchableOpacity onPress={logout} style={{ backgroundColor: '#fee2e2', borderRadius: 14, paddingVertical: 16, alignItems: 'center' }}>
-          <Text style={{ color: '#dc2626', fontWeight: '800', fontSize: 15 }}>Logout</Text>
+        <TouchableOpacity onPress={confirmLogout} style={{ backgroundColor: '#fee2e2', borderRadius: 14, paddingVertical: 16, alignItems: 'center' }}>
+          <Ionicons name="log-out-outline" size={24} color="#dc2626" />
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

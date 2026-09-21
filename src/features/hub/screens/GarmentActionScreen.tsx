@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Alert, TextInput } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { MockApi, getSlaStatus } from '../../../infrastructure/api/MockApi';
+import { ApiClient as MockApi, getSlaStatus } from '../../../infrastructure/api/ApiClient';
 import { Garment, GarmentEvent } from '../../../domain/models/types';
 
 export const GarmentActionScreen = () => {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Alert, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { MockApi } from '../../../infrastructure/api/MockApi';
+import { ApiClient as MockApi } from '../../../infrastructure/api/ApiClient';
 
 export const GlobalScanScreen = () => {
   const navigation = useNavigation<any>();

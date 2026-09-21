@@ -1,16 +1,33 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  Alert, SafeAreaView, Modal, TextInput
+  Alert, SafeAreaView, Modal, TextInput, Platform
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../core/auth/AuthContext';
-import { MockApi } from '../../../infrastructure/api/MockApi';
+import { ApiClient as MockApi } from '../../../infrastructure/api/ApiClient';
 import { Garment } from '../../../domain/models/types';
+import { UserProfileModal } from '../../../shared/components/UserProfileModal';
 
 export const RiderDeliveryScreen = () => {
   const { logout, userName, userId } = useAuth();
+
+  const confirmLogout = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to logout?')) logout();
+    } else {
+      Alert.alert('Logout', 'Are you sure you want to logout?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', onPress: logout, style: 'destructive' },
+      ]);
+    }
+  };
   const [garments, setGarments] = useState<Garment[]>([]);
+<<<<<<< HEAD
   const [orders, setOrders] = useState<any[]>([]);
+=======
+  const [showProfile, setShowProfile] = useState(false);
+>>>>>>> c0a5703 (good morning)
 
   // OTP modal
   const [otpModalVisible, setOtpModalVisible] = useState(false);
@@ -69,9 +86,14 @@ export const RiderDeliveryScreen = () => {
           <Text style={styles.headerRole}>Logistics Rider</Text>
           <Text style={styles.headerName}>{userName}</Text>
         </View>
-        <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity style={[styles.logoutBtn, { marginRight: 8 }]} onPress={() => setShowProfile(true)}>
+            <Ionicons name="person-outline" size={24} color="#475569" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.logoutBtn} onPress={confirmLogout}>
+            <Ionicons name="log-out-outline" size={24} color="#475569" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.hero}>
@@ -149,8 +171,9 @@ export const RiderDeliveryScreen = () => {
           </View>
         }
       />
+      <UserProfileModal visible={showProfile} onClose={() => setShowProfile(false)} />
 
-      {/* OTP Confirmation Modal */}
+      {/* Verification Modal */}
       <Modal visible={otpModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
@@ -187,8 +210,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#fff' },
   headerRole: { fontSize: 13, color: '#f97316', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   headerName: { fontSize: 20, fontWeight: '800', color: '#1e293b', marginTop: 2 },
-  logoutBtn: { backgroundColor: '#f1f5f9', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  logoutText: { color: '#475569', fontWeight: '700', fontSize: 14 },
+  logoutBtn: { padding: 4 },
 
   hero: { backgroundColor: '#1e293b', margin: 16, borderRadius: 16, padding: 20 },
   heroStats: { flexDirection: 'row' },

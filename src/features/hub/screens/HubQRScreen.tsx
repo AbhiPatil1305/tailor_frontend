@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Alert } from 'react-native';
-import { MockApi } from '../../../infrastructure/api/MockApi';
+import { ApiClient as MockApi } from '../../../infrastructure/api/ApiClient';
 import { Garment } from '../../../domain/models/types';
 import { StatusBadge } from '../../../shared/components/StatusBadge';
 import { SLAIndicator } from '../../../shared/components/SLAIndicator';

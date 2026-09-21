@@ -1,11 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  SafeAreaView, TextInput, Alert
+  SafeAreaView, TextInput, Alert, Platform, ActivityIndicator
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../core/auth/AuthContext';
+<<<<<<< HEAD
 import { MockApi } from '../../../infrastructure/api/MockApi';
 import { Order, GarmentMeasurements } from '../../../domain/models/types';
+=======
+import { ApiClient } from '../../../infrastructure/api/ApiClient';
+import { Order } from '../../../domain/models/types';
+import { UserProfileModal } from '../../../shared/components/UserProfileModal';
+import { LocationPickerModal } from '../../../shared/components/LocationPickerModal';
+import { LocationService, Coordinates } from '../../../infrastructure/services/LocationService';
+>>>>>>> c0a5703 (good morning)
 
 const GARMENT_TYPES = ['Shirt', 'Trousers', 'Kurta', 'Suit', 'Saree', 'Dress', 'Other'];
 const GENDER_OPTIONS = ['ladies', 'gents', 'kids', 'unisex'] as const;
@@ -32,6 +41,7 @@ const MEASUREMENT_FIELDS: Record<string, string[]> = {
 
 export const CustomerBookingScreen = () => {
   const { logout, userName } = useAuth();
+<<<<<<< HEAD
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
 
   // Booking form state
@@ -48,9 +58,42 @@ export const CustomerBookingScreen = () => {
   const [pickupDate, setPickupDate] = useState('Tomorrow');
   const [pickupTime, setPickupTime] = useState('10:00 AM – 12:00 PM');
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'online'>('cod');
+=======
+  const [showProfile, setShowProfile] = useState(false);
+
+  const confirmLogout = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to logout?')) logout();
+    } else {
+      Alert.alert('Logout', 'Are you sure you want to logout?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', onPress: logout, style: 'destructive' },
+      ]);
+    }
+  };
+  const [tab, setTab] = useState<'book' | 'track'>('book');
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
+
+  // Booking form state
+  const [customerName, setCustomerName] = useState('John Doe');
+  const [customerPhone, setCustomerPhone] = useState('+919876543210');
+  
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [customerCoords, setCustomerCoords] = useState<Coordinates | null>(null);
+
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [fetchingLocation, setFetchingLocation] = useState(false);
+  const [garments, setGarments] = useState([{ type: 'Shirt', gender: 'gents' as const }]);
+  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'ONLINE'>('COD');
+>>>>>>> c0a5703 (good morning)
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+<<<<<<< HEAD
   useEffect(() => {
     loadSavedMeasurements();
   }, []);
@@ -58,6 +101,31 @@ export const CustomerBookingScreen = () => {
   const loadSavedMeasurements = async () => {
     const saved = await MockApi.getCustomerSavedMeasurements('c1');
     setSavedMeasurements(saved || {});
+=======
+  useEffect(() => { loadOrders(); loadAddresses(); }, []);
+  useEffect(() => { if (tab === 'track') loadOrders(); }, [tab]);
+
+  const loadOrders = async () => {
+    try {
+      const data = await ApiClient.getMyOrders();
+      setOrders(data.reverse());
+    } catch (e) {
+      console.warn('Failed to load orders', e);
+    }
+  };
+
+  const loadAddresses = async () => {
+    try {
+      const data = await ApiClient.getAddresses();
+      setSavedAddresses(data);
+      if (data.length > 0) {
+        setSelectedAddressId(data[0].id || data[0]._id);
+        setCustomerAddress(data[0].addressLine1);
+      }
+    } catch (e) {
+      console.warn('Failed to load addresses', e);
+    }
+>>>>>>> c0a5703 (good morning)
   };
 
   const getPayout = (t: string) => t === 'Shirt' ? 150 : t === 'Trousers' ? 180 : t === 'Kurta' ? 200 : t === 'Suit' ? 500 : t === 'Saree' ? 300 : t === 'Dress' ? 250 : 160;
@@ -113,6 +181,7 @@ export const CustomerBookingScreen = () => {
     setErrors({});
     setLoading(true);
     try {
+<<<<<<< HEAD
       // Map frontend state to API format
       const finalGarments = garments.map(g => {
         let measurementPayload: GarmentMeasurements | undefined = undefined;
@@ -157,6 +226,45 @@ export const CustomerBookingScreen = () => {
         pickupDate, pickupTime,
         paymentMethod,
         garments: finalGarments as any,
+=======
+      let finalAddressId = selectedAddressId;
+
+      // If it's a newly picked address (no ID), save it to DB first
+      if (!finalAddressId) {
+        const parts = customerAddress.split(',');
+        const newAddr = await ApiClient.createAddress({
+          label: 'My Location',
+          recipientName: customerName,
+          phone: customerPhone,
+          addressLine1: customerAddress,
+          city: parts.length > 1 ? parts[parts.length - 2].trim() : 'Bidar',
+          state: parts.length > 0 ? parts[parts.length - 1].trim() : 'Karnataka',
+          pincode: '585401', // Default pin if unable to parse
+          location: customerCoords ? {
+            type: 'Point',
+            coordinates: [customerCoords.longitude, customerCoords.latitude]
+          } : undefined
+        });
+        finalAddressId = newAddr.id || newAddr._id;
+        await loadAddresses();
+      }
+
+      const order = await ApiClient.bookOrder({
+        addressId: finalAddressId,
+        hubId: 'h1',
+        pickupSlot: {
+          date: new Date().toISOString().split('T')[0],
+          startTime: '10:00',
+          endTime: '11:00'
+        },
+        paymentMethod,
+        garments: garments.map(g => ({
+          type: g.type.toUpperCase(),
+          gender: g.gender.toUpperCase(),
+          serviceCharge: 120.00,
+          measurements: { unit: 'cm' }
+        })),
+>>>>>>> c0a5703 (good morning)
       });
       setConfirmedOrder(order);
     } catch (e: any) {
@@ -166,6 +274,7 @@ export const CustomerBookingScreen = () => {
     }
   };
 
+<<<<<<< HEAD
   const renderStepper = (type: string) => {
     const count = garments.filter(g => g.type === type).length;
     const price = Math.round(getPayout(type) * 1.6);
@@ -189,6 +298,13 @@ export const CustomerBookingScreen = () => {
         </View>
       </View>
     );
+=======
+  const stageIndex = (stage: string) => STAGE_ORDER.indexOf(stage);
+  const getSlaColor = (slaDeadline?: string) => {
+    if (!slaDeadline) return '#94a3b8';
+    const sla = ApiClient.getSlaStatus(slaDeadline);
+    return sla.color;
+>>>>>>> c0a5703 (good morning)
   };
 
   return (
@@ -198,12 +314,46 @@ export const CustomerBookingScreen = () => {
           <Text style={styles.greeting}>Welcome back,</Text>
           <Text style={styles.userName}>{userName}</Text>
         </View>
+<<<<<<< HEAD
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <View style={styles.profileIcon}><Text style={styles.profileIconText}>👤</Text></View>
           <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
         </View>
+=======
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity style={[styles.logoutBtn, { marginRight: 8 }]} onPress={() => setShowProfile(true)}>
+            <Ionicons name="person-outline" size={24} color="#475569" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.logoutBtn} onPress={confirmLogout}>
+            <Ionicons name="log-out-outline" size={24} color="#475569" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <UserProfileModal visible={showProfile} onClose={() => setShowProfile(false)} />
+      <LocationPickerModal 
+        visible={showMapModal} 
+        onClose={() => setShowMapModal(false)}
+        onSelectAddress={(addr, coords) => {
+          setCustomerAddress(addr);
+          setCustomerCoords(coords);
+          setSelectedAddressId(null);
+        }}
+      />
+
+      {/* Tabs */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity style={[styles.tab, tab === 'book' && styles.activeTab]} onPress={() => setTab('book')}>
+          <Text style={[styles.tabText, tab === 'book' && styles.activeTabText]}>New Booking</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.tab, tab === 'track' && styles.activeTab]} onPress={() => setTab('track')}>
+          <Text style={[styles.tabText, tab === 'track' && styles.activeTabText]}>
+            Track Orders {orders.length > 0 ? `(${orders.length})` : ''}
+          </Text>
+        </TouchableOpacity>
+>>>>>>> c0a5703 (good morning)
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -221,8 +371,59 @@ export const CustomerBookingScreen = () => {
               {errors.customerPhone && <Text style={styles.errorText}>{errors.customerPhone}</Text>}
               
               <Text style={styles.inputLabel}>Delivery Address</Text>
+<<<<<<< HEAD
               <TextInput style={[styles.input, { height: 60 }, errors.customerAddress ? styles.inputError : null]} value={customerAddress} onChangeText={setCustomerAddress} multiline placeholder="Full address" />
               {errors.customerAddress && <Text style={styles.errorText}>{errors.customerAddress}</Text>}
+=======
+              <TextInput 
+                style={[styles.input, { height: 60 }]} 
+                value={customerAddress} 
+                onChangeText={(txt) => { setCustomerAddress(txt); setSelectedAddressId(null); }} 
+                multiline 
+                placeholder="Full address" 
+              />
+              
+              <View style={{ flexDirection: 'row', marginTop: 12 }}>
+                <TouchableOpacity 
+                  style={[styles.actionBtn, { flex: 1, backgroundColor: '#f1f5f9' }]}
+                  onPress={() => setShowMapModal(true)}
+                >
+                  <Ionicons name="location" size={18} color="#3b82f6" />
+                  <Text style={[styles.actionBtnText, { color: '#3b82f6' }]}>Get My Current Location</Text>
+                </TouchableOpacity>
+              </View>
+
+              {savedAddresses.length > 0 && (
+                <>
+                  <Text style={[styles.inputLabel, { marginTop: 20, fontSize: 13, color: '#94a3b8' }]}>Or pick from saved:</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+                    {savedAddresses.map((addrObj, i) => {
+                      const id = addrObj.id || addrObj._id;
+                      const isSelected = selectedAddressId === id;
+                      return (
+                        <TouchableOpacity 
+                          key={id} 
+                          style={[styles.savedAddressChip, isSelected && styles.savedAddressChipActive]}
+                          onPress={() => {
+                            setSelectedAddressId(id);
+                            setCustomerAddress(addrObj.addressLine1);
+                            if (addrObj.location?.coordinates) {
+                              setCustomerCoords({
+                                longitude: addrObj.location.coordinates[0],
+                                latitude: addrObj.location.coordinates[1]
+                              });
+                            }
+                          }}
+                        >
+                          <Ionicons name={isSelected ? "radio-button-on" : "radio-button-off"} size={16} color={isSelected ? "#3b82f6" : "#94a3b8"} />
+                          <Text style={[styles.savedAddressText, isSelected && styles.savedAddressTextActive]}>{addrObj.label || 'Home'}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </>
+              )}
+>>>>>>> c0a5703 (good morning)
             </View>
 
             <View style={styles.card}>
@@ -322,11 +523,11 @@ export const CustomerBookingScreen = () => {
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Payment</Text>
               <View style={styles.paymentRow}>
-                <TouchableOpacity style={[styles.payBtn, paymentMethod === 'cod' && styles.payBtnActive]} onPress={() => setPaymentMethod('cod')}>
-                  <Text style={paymentMethod === 'cod' ? styles.payBtnTextActive : styles.payBtnText}>💵 Cash on Delivery</Text>
+                <TouchableOpacity style={[styles.payBtn, paymentMethod === 'COD' && styles.payBtnActive]} onPress={() => setPaymentMethod('COD')}>
+                  <Text style={paymentMethod === 'COD' ? styles.payBtnTextActive : styles.payBtnText}>💵 Cash on Delivery</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.payBtn, paymentMethod === 'online' && styles.payBtnActive]} onPress={() => setPaymentMethod('online')}>
-                  <Text style={paymentMethod === 'online' ? styles.payBtnTextActive : styles.payBtnText}>📱 UPI / Card</Text>
+                <TouchableOpacity style={[styles.payBtn, paymentMethod === 'ONLINE' && styles.payBtnActive]} onPress={() => setPaymentMethod('ONLINE')}>
+                  <Text style={paymentMethod === 'ONLINE' ? styles.payBtnTextActive : styles.payBtnText}>📱 UPI / Card</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -409,12 +610,84 @@ export const CustomerBookingScreen = () => {
             </TouchableOpacity>
           </View>
         )}
+<<<<<<< HEAD
+=======
+
+        {/* ── TRACKING TAB ─────────────────────────── */}
+        {tab === 'track' && (
+          <>
+            {orders.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyIcon}>📦</Text>
+                <Text style={styles.emptyTitle}>No Orders Yet</Text>
+                <Text style={styles.emptySub}>Book a pickup to get started.</Text>
+              </View>
+            ) : (
+              orders.map(order => (
+                <View key={order.id} style={styles.trackingCard}>
+                  <View style={styles.trackingHeader}>
+                    <View>
+                      <Text style={styles.trackingRef}>{order.trackingReference}</Text>
+                      <Text style={styles.trackingDate}>{new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</Text>
+                    </View>
+                    <View style={[styles.paymentBadge, { backgroundColor: order.paymentStatus === 'cod_pending' ? '#fef3c7' : '#dcfce7' }]}>
+                      <Text style={[styles.paymentBadgeText, { color: order.paymentStatus === 'cod_pending' ? '#d97706' : '#16a34a' }]}>
+                        {order.paymentMethod === 'cod' ? 'COD' : 'PAID'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Per-garment tracking timeline */}
+                  {order.garments.map((garment, gi) => {
+                    const currentIdx = stageIndex(garment.stage);
+                    const sla = garment.slaDeadline ? ApiClient.getSlaStatus(garment.slaDeadline) : null;
+                    return (
+                      <View key={garment.id} style={styles.garmentTracker}>
+                        <View style={styles.garmentTrackerHeader}>
+                          <Text style={styles.garmentTrackerTitle}>{garment.type} ({garment.gender})</Text>
+                          <Text style={styles.garmentQr}>{garment.qrCode}</Text>
+                        </View>
+                        {sla && (
+                          <View style={[styles.slaBadge, { backgroundColor: sla.color + '20' }]}>
+                            <Text style={[styles.slaText, { color: sla.color }]}>⏱ {sla.label}</Text>
+                          </View>
+                        )}
+                        <View style={styles.timeline}>
+                          {TRACKING_STAGES.filter(s => s.key !== 'rework').map((stage, si) => {
+                            const realIdx = stageIndex(stage.key);
+                            const done = currentIdx >= realIdx;
+                            const isCurrent = currentIdx === realIdx;
+                            return (
+                              <View key={stage.key} style={styles.timelineStep}>
+                                <View style={styles.timelineLeft}>
+                                  <View style={[styles.dot, done ? styles.dotDone : styles.dotPending, isCurrent && styles.dotCurrent]} />
+                                  {si < TRACKING_STAGES.filter(s => s.key !== 'rework').length - 1 && (
+                                    <View style={[styles.line, done && styles.lineDone]} />
+                                  )}
+                                </View>
+                                <Text style={[styles.stageLabel, done && styles.stageLabelDone, isCurrent && styles.stageLabelCurrent]}>
+                                  {stage.label} {isCurrent ? '←' : ''}
+                                </Text>
+                              </View>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              ))
+            )}
+          </>
+        )}
+>>>>>>> c0a5703 (good morning)
       </ScrollView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+<<<<<<< HEAD
   safeArea: { flex: 1, backgroundColor: '#f8fafc' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
   greeting: { fontSize: 13, color: '#64748b' },
@@ -423,6 +696,13 @@ const styles = StyleSheet.create({
   profileIconText: { fontSize: 16 },
   logoutBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#f1f5f9', borderRadius: 6 },
   logoutText: { color: '#ef4444', fontWeight: '600', fontSize: 13 },
+=======
+  safeArea: { flex: 1, backgroundColor: '#f1f5f9' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#fff' },
+  greeting: { fontSize: 13, color: '#64748b', fontWeight: '500' },
+  userName: { fontSize: 20, fontWeight: '800', color: '#1e293b' },
+  logoutBtn: { padding: 4 },
+>>>>>>> c0a5703 (good morning)
 
   scrollContent: { padding: 16, paddingBottom: 60 },
   card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
@@ -501,4 +781,45 @@ const styles = StyleSheet.create({
   successRowValue: { fontSize: 14, color: '#1e293b', fontWeight: '600' },
   secondaryBtn: { backgroundColor: '#f8fafc', paddingVertical: 14, paddingHorizontal: 24, borderRadius: 12, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
   secondaryBtnText: { color: '#475569', fontSize: 15, fontWeight: '700' },
+<<<<<<< HEAD
+=======
+
+  emptyState: { alignItems: 'center', paddingVertical: 60 },
+  emptyIcon: { fontSize: 48, marginBottom: 16 },
+  emptyTitle: { fontSize: 20, fontWeight: '700', color: '#1e293b', marginBottom: 8 },
+  emptySub: { fontSize: 14, color: '#64748b' },
+
+  trackingCard: { backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
+  trackingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  trackingRef: { fontSize: 16, fontWeight: '800', color: '#1e293b' },
+  trackingDate: { color: '#94a3b8', fontSize: 13, marginTop: 2 },
+  paymentBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  paymentBadgeText: { fontWeight: '800', fontSize: 12 },
+
+  garmentTracker: { marginBottom: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#f8fafc' },
+  garmentTrackerHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  garmentTrackerTitle: { fontSize: 15, fontWeight: '700', color: '#1e293b' },
+  garmentQr: { fontSize: 12, color: '#94a3b8', fontFamily: 'Courier' },
+  slaBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginBottom: 12, alignSelf: 'flex-start' },
+  slaText: { fontSize: 12, fontWeight: '700' },
+
+  timeline: { paddingLeft: 4 },
+  timelineStep: { flexDirection: 'row', alignItems: 'flex-start', minHeight: 32 },
+  timelineLeft: { alignItems: 'center', marginRight: 12, width: 16 },
+  dot: { width: 12, height: 12, borderRadius: 6, marginTop: 3 },
+  dotPending: { backgroundColor: '#e2e8f0', borderWidth: 2, borderColor: '#cbd5e1' },
+  dotDone: { backgroundColor: '#10b981' },
+  dotCurrent: { backgroundColor: '#3b82f6', width: 14, height: 14, borderRadius: 7 },
+  line: { width: 2, flex: 1, minHeight: 16, backgroundColor: '#e2e8f0', marginTop: 2 },
+  lineDone: { backgroundColor: '#10b981' },
+  stageLabel: { fontSize: 14, color: '#94a3b8', paddingTop: 1, paddingBottom: 12, fontWeight: '500' },
+  stageLabelDone: { color: '#475569' },
+  stageLabelCurrent: { color: '#3b82f6', fontWeight: '800' },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 12, gap: 6 },
+  actionBtnText: { fontSize: 14, fontWeight: '700' },
+  savedAddressChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#e2e8f0', gap: 6 },
+  savedAddressChipActive: { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' },
+  savedAddressText: { fontSize: 13, color: '#64748b', fontWeight: '500' },
+  savedAddressTextActive: { color: '#1e40af', fontWeight: '700' }
+>>>>>>> c0a5703 (good morning)
 });

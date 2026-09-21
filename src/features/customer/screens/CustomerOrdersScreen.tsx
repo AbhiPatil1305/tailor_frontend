@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, SafeAreaView, RefreshControl } from 'react-native';
-import { MockApi } from '../../../infrastructure/api/MockApi';
+import { ApiClient as MockApi } from '../../../infrastructure/api/ApiClient';
 import { Order } from '../../../domain/models/types';
 import { EmptyState } from '../../../shared/components/EmptyState';
 import { LoadingState } from '../../../shared/components/LoadingState';
