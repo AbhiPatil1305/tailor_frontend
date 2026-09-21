@@ -89,7 +89,8 @@ export interface Garment {
   hubId: string;
   type: string;
   gender: GenderCategory;
-  measurements?: GarmentMeasurements;
+  measurements?: string;
+  measurementsConfirmed?: boolean;
   notes?: string;
   serviceCharge: number;
   payoutAmount: number;

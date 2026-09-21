@@ -81,14 +81,8 @@ function makeGarment(opts: {
     stage: opts.stage,
     assignedTailorId: opts.assignedTailorId,
     intakeTime, slaDeadline, createdAt,
-    measurements: {
-      version: 1,
-      status: 'CONFIRMED',
-      source: 'SAVED',
-      data: { Chest: 38, Length: 32 },
-      confirmedAt: createdAt,
-      confirmedBy: opts.customerId
-    },
+    measurements: '38-32-standard',
+    measurementsConfirmed: opts.id !== 'g009', // Make one unconfirmed for testing
     notes: opts.notes || '',
   };
 }
