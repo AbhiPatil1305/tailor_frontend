@@ -82,6 +82,7 @@ function makeGarment(opts: {
     assignedTailorId: opts.assignedTailorId,
     intakeTime, slaDeadline, createdAt,
     measurements: '38-32-standard',
+    measurementsConfirmed: opts.id !== 'g009', // Make one unconfirmed for testing
     notes: opts.notes || '',
   };
 }

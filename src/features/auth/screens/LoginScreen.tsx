@@ -62,7 +62,7 @@ export const LoginScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <View style={styles.container}>
 
         {/* Header */}
         <View style={styles.header}>
@@ -85,46 +85,48 @@ export const LoginScreen = () => {
         </TouchableOpacity>
 
         {/* Role cards */}
-        {DEMO_ACCOUNTS.map(section => (
-          <View key={section.section} style={styles.section}>
-            <Text style={styles.sectionTitle}>{section.section}</Text>
-            {section.roles.map(r => (
-              <TouchableOpacity
-                key={r.id + r.role}
-                style={[styles.roleCard, { borderLeftColor: r.color }]}
-                onPress={() => login(r.role, r.id, r.name)}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.iconBox, { backgroundColor: r.color + '20' }]}>
-                  <Text style={styles.iconText}>{r.icon}</Text>
-                </View>
-                <View style={styles.roleTextContainer}>
-                  <Text style={styles.roleTitle}>{r.title}</Text>
-                  <Text style={styles.roleEmail}>{r.email}</Text>
-                </View>
-                <Text style={styles.chevron}>›</Text>
-              </TouchableOpacity>
-            ))}
+        <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={true}>
+          {DEMO_ACCOUNTS.map(section => (
+            <View key={section.section} style={styles.section}>
+              <Text style={styles.sectionTitle}>{section.section}</Text>
+              {section.roles.map(r => (
+                <TouchableOpacity
+                  key={r.id + r.role}
+                  style={[styles.roleCard, { borderLeftColor: r.color }]}
+                  onPress={() => login(r.role, r.id, r.name)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.iconBox, { backgroundColor: r.color + '20' }]}>
+                    <Text style={styles.iconText}>{r.icon}</Text>
+                  </View>
+                  <View style={styles.roleTextContainer}>
+                    <Text style={styles.roleTitle}>{r.title}</Text>
+                    <Text style={styles.roleEmail}>{r.email}</Text>
+                  </View>
+                  <Text style={styles.chevron}>›</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ))}
+
+          {/* Refresh warning */}
+          <View style={styles.warningBox}>
+            <Text style={styles.warningIcon}>⚠️</Text>
+            <Text style={styles.warningText}>
+              This is an in-memory demo. Refreshing the browser will clear live session actions.
+              Use <Text style={{ fontWeight: '700' }}>Reset Demo Data</Text> before each presentation.
+            </Text>
           </View>
-        ))}
-
-        {/* Refresh warning */}
-        <View style={styles.warningBox}>
-          <Text style={styles.warningIcon}>⚠️</Text>
-          <Text style={styles.warningText}>
-            This is an in-memory demo. Refreshing the browser will clear live session actions.
-            Use <Text style={{ fontWeight: '700' }}>Reset Demo Data</Text> before each presentation.
-          </Text>
-        </View>
-
-      </ScrollView>
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f8fafc' },
-  container: { flexGrow: 1, padding: 24, paddingBottom: 60, alignItems: 'center' },
+  container: { flex: 1, paddingTop: 24, paddingHorizontal: 24, alignItems: 'center' },
+  scrollContent: { paddingBottom: 60, alignItems: 'center' },
 
   header: { alignItems: 'center', marginTop: 40, marginBottom: 28 },
   logoCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#1e293b', justifyContent: 'center', alignItems: 'center', marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },

@@ -64,6 +64,7 @@ export interface Garment {
   type: string;
   gender: GenderCategory;
   measurements?: string;
+  measurementsConfirmed?: boolean;
   notes?: string;
   serviceCharge: number;
   payoutAmount: number;

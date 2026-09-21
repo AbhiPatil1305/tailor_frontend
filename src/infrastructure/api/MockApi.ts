@@ -115,9 +115,20 @@ export const MockApi = {
     return null;
   },
 
+  getQueueForStage: async (stage: string, hubId?: string): Promise<Garment[]> => {
+    return store.orders.flatMap(o => o.garments)
+      .filter(g => g.stage === stage && (hubId ? g.hubId === hubId : true));
+  },
+
   getGarmentEvents: async (garmentId: string): Promise<GarmentEvent[]> =>
     store.events.filter(e => e.garmentId === garmentId)
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
+
+  getAllEvents: async (hubId?: string): Promise<GarmentEvent[]> => {
+    let events = store.events;
+    if (hubId) events = events.filter(e => e.hubId === hubId);
+    return events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  },
 
   // ── Stage transitions ─────────────────────────────────────────────────────
   advanceGarmentStage: async (
