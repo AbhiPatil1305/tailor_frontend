@@ -20,6 +20,22 @@ export const TailorDashboardScreen = () => {
 
   // Leave modal
   const [leaveModalVisible, setLeaveModalVisible] = useState(false);
+  const [clarificationModalVisible, setClarificationModalVisible] = useState(false);
+  const [clarifyGarmentId, setClarifyGarmentId] = useState('');
+  const [clarifyMessage, setClarifyMessage] = useState('');
+
+  const submitClarification = async () => {
+    if (!clarifyMessage.trim()) return;
+    try {
+      await MockApi.requestClarification(clarifyGarmentId, 'Other', clarifyMessage, tailor?.name || 'Tailor');
+      setClarificationModalVisible(false);
+      setClarifyMessage('');
+      loadData();
+      Alert.alert('Clarification Requested', 'The customer has been notified.');
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
+  };
   const [leaveDate, setLeaveDate] = useState('');
   const [leaveReason, setLeaveReason] = useState('');
 
@@ -260,11 +276,48 @@ export const TailorDashboardScreen = () => {
                     </View>
                   );
                 })()}
+                {/* Measurements Block */}
+                <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, marginVertical: 12 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <Text style={{ fontWeight: '700', color: '#1e293b' }}>Measurements</Text>
+                    {g.measurements?.status === 'CONFIRMED' && <Text style={{ color: '#10b981', fontWeight: '800', fontSize: 12 }}>✓ CONFIRMED (v{g.measurements.version})</Text>}
+                    {g.measurements?.status === 'NEEDS_CLARIFICATION' && <Text style={{ color: '#f59e0b', fontWeight: '800', fontSize: 12 }}>⚠ WAITING FOR CUSTOMER</Text>}
+                    {(!g.measurements || g.measurements.status === 'NOT_PROVIDED') && <Text style={{ color: '#ef4444', fontWeight: '800', fontSize: 12 }}>⚠ NOT PROVIDED</Text>}
+                  </View>
+                  
+                  {g.measurements?.status === 'CONFIRMED' && g.measurements.data && (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {Object.entries(g.measurements.data).map(([k, v]) => (
+                        <View key={k} style={{ backgroundColor: '#fff', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                          <Text style={{ fontSize: 11, color: '#64748b' }}>{k}</Text>
+                          <Text style={{ fontSize: 13, color: '#1e293b', fontWeight: '600' }}>{String(v)}"</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  
+                  {(!g.measurements || g.measurements.status !== 'CONFIRMED') && (
+                     <TouchableOpacity 
+                       style={{ backgroundColor: '#fef2f2', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', marginTop: 4 }}
+                       onPress={() => {
+                         setClarifyGarmentId(g.id);
+                         setClarificationModalVisible(true);
+                       }}
+                     >
+                       <Text style={{ color: '#ef4444', fontWeight: '700', fontSize: 12 }}>REQUEST CLARIFICATION</Text>
+                     </TouchableOpacity>
+                  )}
+                </View>
+
                 <View style={styles.taskActions}>
                   <TouchableOpacity style={styles.callBtn} onPress={callCustomer}>
                     <Text style={styles.callBtnText}>📞 Call</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.finishBtn} onPress={() => advanceStage(g.qrCode)}>
+                  <TouchableOpacity 
+                    style={[styles.finishBtn, (!g.measurements || g.measurements.status !== 'CONFIRMED') && { backgroundColor: '#94a3b8' }]} 
+                    onPress={() => advanceStage(g.qrCode)}
+                    disabled={!g.measurements || g.measurements.status !== 'CONFIRMED'}
+                  >
                     <Text style={styles.finishBtnText}>Finish → QC ✓</Text>
                   </TouchableOpacity>
                 </View>
@@ -301,6 +354,30 @@ export const TailorDashboardScreen = () => {
           </View>
         }
       />
+
+      {/* Clarification Modal */}
+      <Modal visible={clarificationModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Request Clarification</Text>
+            <Text style={styles.inputLabel}>Message to Customer</Text>
+            <TextInput
+              style={[styles.input, { height: 80 }]}
+              multiline
+              placeholder="e.g. Please confirm sleeve length, 50 inches seems incorrect."
+              value={clarifyMessage}
+              onChangeText={setClarifyMessage}
+            />
+            
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setClarificationModalVisible(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.submitBtn} onPress={submitClarification}>
+                <Text style={styles.submitBtnText}>Send Request</Text>
+              </TouchableOpacity>
+                      </View>
+        </View>
+      </Modal>
 
       {/* Leave Modal */}
       <Modal visible={leaveModalVisible} animationType="slide" transparent>

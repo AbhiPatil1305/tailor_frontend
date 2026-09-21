@@ -39,7 +39,11 @@ export type GarmentEventType =
   | 'DISPATCHED'
   | 'OUT_FOR_DELIVERY'
   | 'DELIVERED'
-  | 'COD_COLLECTED';
+  | 'COD_COLLECTED'
+  | 'MEASUREMENTS_ADDED'
+  | 'MEASUREMENTS_UPDATED'
+  | 'MEASUREMENTS_CLARIFICATION_REQUESTED'
+  | 'MEASUREMENTS_CONFIRMED';
 
 export interface GarmentEvent {
   id: string;
@@ -54,6 +58,28 @@ export interface GarmentEvent {
   metadata?: Record<string, any>; // rework reason, OTP, etc.
 }
 
+// ─── Measurements ────────────────────────────────────────────────────────────
+
+export type MeasurementStatus = 'NOT_PROVIDED' | 'DRAFT' | 'NEEDS_CLARIFICATION' | 'CONFIRMED';
+export type MeasurementSource = 'SAVED' | 'NEW' | 'CLARIFICATION';
+
+export interface ClarificationRequest {
+  issue: string;
+  message: string;
+  requestedBy: string; // role/name
+  requestedAt: string; // ISO date
+}
+
+export interface GarmentMeasurements {
+  version: number;
+  status: MeasurementStatus;
+  source: MeasurementSource;
+  data: Record<string, number | string>;
+  confirmedAt?: string;
+  confirmedBy?: string;
+  clarificationRequest?: ClarificationRequest;
+}
+
 // ─── Garment ─────────────────────────────────────────────────────────────────
 
 export interface Garment {
@@ -63,7 +89,7 @@ export interface Garment {
   hubId: string;
   type: string;
   gender: GenderCategory;
-  measurements?: string;
+  measurements?: GarmentMeasurements;
   notes?: string;
   serviceCharge: number;
   payoutAmount: number;
@@ -82,11 +108,12 @@ export interface Garment {
 export interface Order {
   id: string;
   customerId: string;
-  customerName: string;
-  customerPhone: string;
-  customerAddress: string;
-  pickupSlot: string;
-  paymentMethod: PaymentMethod;
+  customerName?: string;
+  customerPhone?: string;
+  customerAddress?: string;
+  pickupDate?: string;
+  pickupTime?: string;
+  paymentMethod: 'cod' | 'online';
   paymentStatus: PaymentStatus;
   totalAmount: number;
   garments: Garment[];

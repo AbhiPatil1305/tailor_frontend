@@ -5,81 +5,160 @@ import {
 } from 'react-native';
 import { useAuth } from '../../../core/auth/AuthContext';
 import { MockApi } from '../../../infrastructure/api/MockApi';
-import { Order } from '../../../domain/models/types';
+import { Order, GarmentMeasurements } from '../../../domain/models/types';
 
 const GARMENT_TYPES = ['Shirt', 'Trousers', 'Kurta', 'Suit', 'Saree', 'Dress', 'Other'];
 const GENDER_OPTIONS = ['ladies', 'gents', 'kids', 'unisex'] as const;
 
-const TRACKING_STAGES = [
-  { key: 'booked',           label: 'Booked' },
-  { key: 'intake',           label: 'Received at Hub' },
-  { key: 'cutting',          label: 'Cutting' },
-  { key: 'stitching',        label: 'Stitching' },
-  { key: 'qc',               label: 'Quality Check' },
-  { key: 'ironing',          label: 'Ironing' },
-  { key: 'packed',           label: 'Packed' },
-  { key: 'dispatched',       label: 'Dispatched' },
-  { key: 'out_for_delivery', label: 'Out for Delivery' },
-  { key: 'delivered',        label: 'Delivered' },
-];
+type MeasurementOption = 'saved' | 'new' | 'none';
 
-const STAGE_ORDER = TRACKING_STAGES.map(s => s.key);
+interface BookingGarment {
+  id: string; // local unique id to track
+  type: string;
+  gender: 'ladies' | 'gents' | 'kids' | 'unisex';
+  measurementOption: MeasurementOption;
+  measurementsData: Record<string, string>;
+}
+
+const MEASUREMENT_FIELDS: Record<string, string[]> = {
+  Shirt: ['Chest', 'Shoulder', 'Sleeve', 'Length', 'Waist'],
+  Trousers: ['Waist', 'Hip', 'Length', 'Thigh', 'Bottom'],
+  Kurta: ['Chest', 'Shoulder', 'Sleeve', 'Length'],
+  Suit: ['Chest', 'Shoulder', 'Sleeve', 'Length', 'Waist', 'Hip', 'Thigh', 'Bottom'],
+  Saree: ['Blouse Bust', 'Blouse Waist', 'Blouse Length'],
+  Dress: ['Bust', 'Waist', 'Hips', 'Length'],
+  Other: ['Custom 1', 'Custom 2']
+};
 
 export const CustomerBookingScreen = () => {
   const { logout, userName } = useAuth();
-  const [tab, setTab] = useState<'book' | 'track'>('book');
-  const [orders, setOrders] = useState<Order[]>([]);
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
 
   // Booking form state
   const [customerName, setCustomerName] = useState('Ravi Kumar');
   const [customerPhone, setCustomerPhone] = useState('9000000001');
   const [customerAddress, setCustomerAddress] = useState('12, Gandhi Nagar, Bidar');
-  const [garments, setGarments] = useState([{ type: 'Shirt', gender: 'gents' as const }]);
-  const [pickupSlot, setPickupSlot] = useState('Tomorrow 10:00–11:00 AM');
+  
+  const [garments, setGarments] = useState<BookingGarment[]>([
+    { id: Math.random().toString(), type: 'Shirt', gender: 'gents', measurementOption: 'none', measurementsData: {} }
+  ]);
+  
+  const [savedMeasurements, setSavedMeasurements] = useState<Record<string, Record<string, any>>>({});
+  
+  const [pickupDate, setPickupDate] = useState('Tomorrow');
+  const [pickupTime, setPickupTime] = useState('10:00 AM – 12:00 PM');
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'online'>('cod');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  useEffect(() => { loadOrders(); }, []);
-  useEffect(() => { if (tab === 'track') loadOrders(); }, [tab]);
+  useEffect(() => {
+    loadSavedMeasurements();
+  }, []);
 
-  const loadOrders = async () => {
-    const data = await MockApi.getOrders();
-    setOrders(data.filter(o => o.customerId === 'c1').reverse());
+  const loadSavedMeasurements = async () => {
+    const saved = await MockApi.getCustomerSavedMeasurements('c1');
+    setSavedMeasurements(saved || {});
   };
 
-  const addGarment = () => {
-    if (garments.length >= 6) return;
-    setGarments(prev => [...prev, { type: 'Shirt', gender: 'gents' }]);
+  const getPayout = (t: string) => t === 'Shirt' ? 150 : t === 'Trousers' ? 180 : t === 'Kurta' ? 200 : t === 'Suit' ? 500 : t === 'Saree' ? 300 : t === 'Dress' ? 250 : 160;
+
+  const handleIncrement = (type: string) => {
+    const defaultGender = (type === 'Saree' || type === 'Dress') ? 'ladies' : (type === 'Other' ? 'unisex' : 'gents');
+    setGarments(prev => [...prev, {
+      id: Math.random().toString(),
+      type,
+      gender: defaultGender,
+      measurementOption: 'none',
+      measurementsData: {}
+    }]);
   };
 
-  const removeGarment = (idx: number) => {
-    setGarments(prev => prev.filter((_, i) => i !== idx));
+  const handleDecrement = (type: string) => {
+    setGarments(prev => {
+      const idx = prev.map(g => g.type).lastIndexOf(type);
+      if (idx === -1) return prev;
+      const next = [...prev];
+      next.splice(idx, 1);
+      return next;
+    });
   };
 
-  const updateGarment = (idx: number, field: 'type' | 'gender', value: string) => {
-    setGarments(prev => prev.map((g, i) => i === idx ? { ...g, [field]: value } : g));
+  const updateGarment = (id: string, field: keyof BookingGarment, value: any) => {
+    setGarments(prev => prev.map(g => g.id === id ? { ...g, [field]: value } : g));
+  };
+
+  const updateMeasurement = (id: string, key: string, val: string) => {
+    setGarments(prev => prev.map(g => g.id === id ? { ...g, measurementsData: { ...g.measurementsData, [key]: val } } : g));
   };
 
   const handleBook = async () => {
-    if (!customerName || !customerPhone || !customerAddress) {
-      Alert.alert('Missing Details', 'Please fill in your name, phone, and address.');
+    const newErrors: { [key: string]: string } = {};
+
+    if (!customerName.trim()) newErrors.customerName = 'Name is required';
+    if (!customerPhone.trim()) {
+      newErrors.customerPhone = 'Mobile number is required';
+    } else if (!/^\d{10}$/.test(customerPhone.trim())) {
+      newErrors.customerPhone = 'Enter a valid 10-digit mobile number';
+    }
+    if (!customerAddress.trim()) newErrors.customerAddress = 'Address is required';
+    if (garments.length === 0) newErrors.garments = 'At least one garment is required';
+    if (!pickupDate) newErrors.pickupDate = 'Pickup date is required';
+    if (!pickupTime) newErrors.pickupTime = 'Pickup time window is required';
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
-    if (!pickupSlot) {
-      Alert.alert('Missing Slot', 'Please select a pickup slot.');
-      return;
-    }
+
+    setErrors({});
     setLoading(true);
     try {
+      // Map frontend state to API format
+      const finalGarments = garments.map(g => {
+        let measurementPayload: GarmentMeasurements | undefined = undefined;
+
+        if (g.measurementOption === 'saved') {
+          const savedData = savedMeasurements[g.type];
+          measurementPayload = {
+            version: 1,
+            status: 'CONFIRMED',
+            source: 'SAVED',
+            data: savedData || {},
+            confirmedAt: new Date().toISOString(),
+            confirmedBy: 'c1'
+          };
+        } else if (g.measurementOption === 'new') {
+          measurementPayload = {
+            version: 1,
+            status: 'CONFIRMED',
+            source: 'NEW',
+            data: g.measurementsData,
+            confirmedAt: new Date().toISOString(),
+            confirmedBy: 'c1'
+          };
+        } else {
+          measurementPayload = {
+            version: 1,
+            status: 'NOT_PROVIDED',
+            source: 'NEW',
+            data: {}
+          };
+        }
+
+        return {
+          type: g.type,
+          gender: g.gender,
+          measurements: measurementPayload
+        };
+      });
+
       const order = await MockApi.bookOrder({
         customerName, customerPhone, customerAddress,
-        pickupSlot,
+        pickupDate, pickupTime,
         paymentMethod,
-        garments: garments as any,
+        garments: finalGarments as any,
       });
       setConfirmedOrder(order);
-      await loadOrders();
     } catch (e: any) {
       Alert.alert('Booking Failed', e.message);
     } finally {
@@ -87,94 +166,158 @@ export const CustomerBookingScreen = () => {
     }
   };
 
-  const stageIndex = (stage: string) => STAGE_ORDER.indexOf(stage);
-  const getSlaColor = (slaDeadline?: string) => {
-    if (!slaDeadline) return '#94a3b8';
-    const sla = MockApi.getSlaStatus(slaDeadline);
-    return sla.color;
+  const renderStepper = (type: string) => {
+    const count = garments.filter(g => g.type === type).length;
+    const price = Math.round(getPayout(type) * 1.6);
+    return (
+      <View key={type} style={styles.counterRow}>
+        <View>
+          <Text style={styles.counterLabel}>{type}</Text>
+          <Text style={styles.counterPrice}>₹{price} / pc</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {count > 0 && <Text style={styles.counterSubtotal}>₹{count * price}</Text>}
+          <View style={styles.stepper}>
+            <TouchableOpacity style={styles.stepperBtn} onPress={() => handleDecrement(type)}>
+              <Text style={styles.stepperBtnText}>-</Text>
+            </TouchableOpacity>
+            <Text style={styles.stepperValue}>{count}</Text>
+            <TouchableOpacity style={styles.stepperBtn} onPress={() => handleIncrement(type)}>
+              <Text style={styles.stepperBtnText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Welcome back,</Text>
           <Text style={styles.userName}>{userName}</Text>
         </View>
-        <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Tabs */}
-      <View style={styles.tabBar}>
-        <TouchableOpacity style={[styles.tab, tab === 'book' && styles.activeTab]} onPress={() => setTab('book')}>
-          <Text style={[styles.tabText, tab === 'book' && styles.activeTabText]}>New Booking</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.tab, tab === 'track' && styles.activeTab]} onPress={() => setTab('track')}>
-          <Text style={[styles.tabText, tab === 'track' && styles.activeTabText]}>
-            Track Orders {orders.length > 0 ? `(${orders.length})` : ''}
-          </Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={styles.profileIcon}><Text style={styles.profileIconText}>👤</Text></View>
+          <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-        {/* ── BOOKING TAB ────────────────────────────── */}
-        {tab === 'book' && !confirmedOrder && (
+        {!confirmedOrder && (
           <>
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Your Details</Text>
               <Text style={styles.inputLabel}>Full Name</Text>
-              <TextInput style={styles.input} value={customerName} onChangeText={setCustomerName} placeholder="e.g. Ravi Kumar" />
+              <TextInput style={[styles.input, errors.customerName ? styles.inputError : null]} value={customerName} onChangeText={setCustomerName} placeholder="e.g. Ravi Kumar" />
+              {errors.customerName && <Text style={styles.errorText}>{errors.customerName}</Text>}
+              
               <Text style={styles.inputLabel}>Mobile Number</Text>
-              <TextInput style={styles.input} value={customerPhone} onChangeText={setCustomerPhone} keyboardType="phone-pad" placeholder="10-digit number" />
+              <TextInput style={[styles.input, errors.customerPhone ? styles.inputError : null]} value={customerPhone} onChangeText={setCustomerPhone} keyboardType="phone-pad" placeholder="10-digit number" />
+              {errors.customerPhone && <Text style={styles.errorText}>{errors.customerPhone}</Text>}
+              
               <Text style={styles.inputLabel}>Delivery Address</Text>
-              <TextInput style={[styles.input, { height: 60 }]} value={customerAddress} onChangeText={setCustomerAddress} multiline placeholder="Full address" />
+              <TextInput style={[styles.input, { height: 60 }, errors.customerAddress ? styles.inputError : null]} value={customerAddress} onChangeText={setCustomerAddress} multiline placeholder="Full address" />
+              {errors.customerAddress && <Text style={styles.errorText}>{errors.customerAddress}</Text>}
             </View>
 
             <View style={styles.card}>
-              <View style={styles.cardTitleRow}>
-                <Text style={styles.cardTitle}>Garments ({garments.length})</Text>
-                {garments.length < 6 && (
-                  <TouchableOpacity style={styles.addGarmentBtn} onPress={addGarment}>
-                    <Text style={styles.addGarmentText}>+ Add</Text>
-                  </TouchableOpacity>
-                )}
+              <Text style={styles.cardTitle}>Select Garments</Text>
+              <View style={{ marginTop: 8 }}>
+                {GARMENT_TYPES.map(type => renderStepper(type))}
               </View>
-
-              {garments.map((g, idx) => (
-                <View key={idx} style={styles.garmentRow}>
-                  <View style={styles.garmentIndex}><Text style={styles.garmentIndexText}>{idx + 1}</Text></View>
-                  <View style={styles.garmentFields}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      <View style={styles.pillGroup}>
-                        {GARMENT_TYPES.map(t => (
-                          <TouchableOpacity key={t} style={[styles.pill, g.type === t && styles.activePill]} onPress={() => updateGarment(idx, 'type', t)}>
-                            <Text style={[styles.pillText, g.type === t && styles.activePillText]}>{t}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </ScrollView>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
-                      <View style={styles.pillGroup}>
-                        {GENDER_OPTIONS.map(gv => (
-                          <TouchableOpacity key={gv} style={[styles.pill, g.gender === gv && styles.activePillGender]} onPress={() => updateGarment(idx, 'gender', gv)}>
-                            <Text style={[styles.pillText, g.gender === gv && styles.activePillText]}>{gv}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </ScrollView>
-                  </View>
-                  {garments.length > 1 && (
-                    <TouchableOpacity onPress={() => removeGarment(idx)} style={styles.removeBtn}>
-                      <Text style={styles.removeBtnText}>✕</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ))}
+              {errors.garments && <Text style={styles.errorText}>{errors.garments}</Text>}
             </View>
+
+            {garments.length > 0 && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Garment Details & Measurements</Text>
+                {garments.map((g, idx) => {
+                  const price = Math.round(getPayout(g.type) * 1.6);
+                  return (
+                    <View key={g.id} style={styles.garmentDetailCard}>
+                      <View style={styles.garmentHeader}>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <View style={styles.garmentIndex}><Text style={styles.garmentIndexText}>{idx + 1}</Text></View>
+                          <Text style={styles.garmentTitleText}>{g.type}</Text>
+                        </View>
+                        <Text style={styles.garmentPrice}>₹{price}</Text>
+                      </View>
+                      
+                      {/* Gender Selection */}
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                        <View style={styles.pillGroup}>
+                          {GENDER_OPTIONS.map(gv => (
+                            <TouchableOpacity key={gv} style={[styles.pill, g.gender === gv && styles.activePillGender]} onPress={() => updateGarment(g.id, 'gender', gv)}>
+                              <Text style={[styles.pillText, g.gender === gv && styles.activePillText]}>{gv}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </ScrollView>
+
+                      {/* Measurements Section */}
+                      <View style={styles.measurementsBox}>
+                        <Text style={styles.measurementsTitle}>Measurements</Text>
+                        <View style={styles.radioGroup}>
+                          <TouchableOpacity style={styles.radioOpt} onPress={() => updateGarment(g.id, 'measurementOption', 'saved')}>
+                            <View style={styles.radioCircle}>{g.measurementOption === 'saved' && <View style={styles.radioDot} />}</View>
+                            <Text style={styles.radioLabel}>Use Saved</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.radioOpt} onPress={() => updateGarment(g.id, 'measurementOption', 'new')}>
+                            <View style={styles.radioCircle}>{g.measurementOption === 'new' && <View style={styles.radioDot} />}</View>
+                            <Text style={styles.radioLabel}>Enter New</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.radioOpt} onPress={() => updateGarment(g.id, 'measurementOption', 'none')}>
+                            <View style={styles.radioCircle}>{g.measurementOption === 'none' && <View style={styles.radioDot} />}</View>
+                            <Text style={styles.radioLabel}>I Don't Have</Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {g.measurementOption === 'saved' && (
+                          <View style={styles.savedBox}>
+                            {savedMeasurements[g.type] ? (
+                              <>
+                                <Text style={styles.savedTitle}>{g.type} Profile — Ravi Kumar</Text>
+                                <Text style={styles.savedData}>
+                                  {Object.entries(savedMeasurements[g.type]).map(([k, v]) => `${k}: ${v}"`).join('  •  ')}
+                                </Text>
+                              </>
+                            ) : (
+                              <Text style={styles.savedData}>No saved measurements for {g.type}.</Text>
+                            )}
+                          </View>
+                        )}
+
+                        {g.measurementOption === 'new' && (
+                          <View style={styles.newMeasurementsGrid}>
+                            {(MEASUREMENT_FIELDS[g.type] || []).map(f => (
+                              <View key={f} style={styles.measurementField}>
+                                <Text style={styles.measurementLabel}>{f}</Text>
+                                <TextInput 
+                                  style={styles.measurementInput}
+                                  placeholder='in'
+                                  keyboardType="numeric"
+                                  value={g.measurementsData[f] || ''}
+                                  onChangeText={(v) => updateMeasurement(g.id, f, v)}
+                                />
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                        
+                        {g.measurementOption === 'none' && (
+                          <Text style={styles.noMeasurementsHelp}>Measurements can be clarified later by the tailor or hub.</Text>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
 
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Payment</Text>
@@ -189,123 +332,82 @@ export const CustomerBookingScreen = () => {
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Pickup Slot</Text>
+              <Text style={styles.cardTitle}>Pickup Date</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.pillGroup}>
-                  {['Tomorrow 10:00–11:00 AM', 'Tomorrow 12:00–01:00 PM', 'Tomorrow 02:00–03:00 PM', 'Tomorrow 04:00–05:00 PM'].map(slot => (
-                    <TouchableOpacity key={slot} style={[styles.pill, pickupSlot === slot && styles.activePill]} onPress={() => setPickupSlot(slot)}>
-                      <Text style={[styles.pillText, pickupSlot === slot && styles.activePillText]}>{slot.replace('Tomorrow ', '')}</Text>
+                  {['Today', 'Tomorrow', '24 Sep', '25 Sep'].map(dt => (
+                    <TouchableOpacity key={dt} style={[styles.pill, pickupDate === dt && styles.activePill]} onPress={() => setPickupDate(dt)}>
+                      <Text style={[styles.pillText, pickupDate === dt && styles.activePillText]}>{dt}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               </ScrollView>
+              {errors.pickupDate && <Text style={[styles.errorText, { marginTop: 10 }]}>{errors.pickupDate}</Text>}
+
+              <Text style={[styles.cardTitle, { marginTop: 20 }]}>Pickup Time Window</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.pillGroup}>
+                  {['10:00 AM – 12:00 PM', '02:00 PM – 04:00 PM', '05:00 PM – 07:00 PM'].map(time => (
+                    <TouchableOpacity key={time} style={[styles.pill, pickupTime === time && styles.activePill]} onPress={() => setPickupTime(time)}>
+                      <Text style={[styles.pillText, pickupTime === time && styles.activePillText]}>{time}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+              {errors.pickupTime && <Text style={[styles.errorText, { marginTop: 10 }]}>{errors.pickupTime}</Text>}
+            </View>
+
+            {/* PRE-BOOKING SUMMARY OF MEASUREMENTS */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Booking Summary</Text>
+              {garments.map((g, idx) => (
+                <View key={g.id} style={{flexDirection:'row', justifyContent:'space-between', marginBottom: 8}}>
+                  <Text style={{color:'#1e293b', fontWeight:'600'}}>{idx+1}. {g.type} ({g.gender})</Text>
+                  <Text style={{color: g.measurementOption === 'none' ? '#f59e0b' : '#10b981', fontWeight:'600'}}>
+                    {g.measurementOption === 'none' ? '⚠ Not provided' : (g.measurementOption === 'saved' ? '✓ Saved' : '✓ Confirmed')}
+                  </Text>
+                </View>
+              ))}
             </View>
 
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryText}>Pickup: {pickupSlot.split(' ')[0]} {pickupSlot.split(' ')[1]}</Text>
-              <Text style={styles.summaryAmount}>₹{garments.reduce((sum, g) => {
-                const payout = g.type === 'Shirt' ? 150 : g.type === 'Trousers' ? 180 : g.type === 'Kurta' ? 200 : g.type === 'Suit' ? 500 : 160;
-                return sum + Math.round(payout * 1.6);
-              }, 0)}</Text>
+              <View>
+                <Text style={styles.summaryText}>Pickup: {pickupDate}</Text>
+                <Text style={[styles.summaryText, { fontSize: 12, color: '#64748b', marginTop: 2 }]}>{pickupTime}</Text>
+              </View>
+              <Text style={styles.summaryAmount}>₹{garments.reduce((sum, g) => sum + Math.round(getPayout(g.type) * 1.6), 0)}</Text>
             </View>
 
             <TouchableOpacity style={[styles.primaryBtn, loading && styles.primaryBtnDisabled]} onPress={handleBook} disabled={loading}>
-              <Text style={styles.primaryBtnText}>{loading ? 'Booking...' : `Confirm Booking (₹${garments.reduce((sum, g) => {
-                const payout = g.type === 'Shirt' ? 150 : g.type === 'Trousers' ? 180 : g.type === 'Kurta' ? 200 : g.type === 'Suit' ? 500 : 160;
-                return sum + Math.round(payout * 1.6);
-              }, 0)})`}</Text>
+              <Text style={styles.primaryBtnText}>{loading ? 'Booking...' : `Confirm Booking (₹${garments.reduce((sum, g) => sum + Math.round(getPayout(g.type) * 1.6), 0)})`}</Text>
             </TouchableOpacity>
           </>
         )}
 
         {/* ── SUCCESS CARD ──────────────────────────── */}
-        {tab === 'book' && confirmedOrder && (
+        {confirmedOrder && (
           <View style={styles.successCard}>
             <View style={styles.successIconBox}><Text style={styles.successIcon}>✓</Text></View>
             <Text style={styles.successTitle}>Booking Confirmed!</Text>
-            <Text style={styles.successSub}>Our rider will arrive at your selected slot.</Text>
+            <Text style={styles.successSub}>Our rider will arrive for pickup.</Text>
+            
             <View style={styles.refBox}>
               <Text style={styles.refLabel}>Tracking Reference</Text>
               <Text style={styles.refValue}>{confirmedOrder.trackingReference}</Text>
             </View>
-            <Text style={styles.garmentsSummary}>
-              {confirmedOrder.garments.map(g => `${g.type} (${g.gender})`).join(' • ')}
-            </Text>
-            <TouchableOpacity style={styles.secondaryBtn} onPress={() => { setConfirmedOrder(null); setGarments([{ type: 'Shirt', gender: 'gents' }]); }}>
+            
+            <View style={{ width: '100%', marginBottom: 24, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 16 }}>
+              <View style={styles.successRow}><Text style={styles.successRowLabel}>Garments</Text><Text style={styles.successRowValue}>{confirmedOrder.garments.length} Items</Text></View>
+              <View style={styles.successRow}><Text style={styles.successRowLabel}>Pickup Date</Text><Text style={styles.successRowValue}>{confirmedOrder.pickupDate}</Text></View>
+              <View style={styles.successRow}><Text style={styles.successRowLabel}>Time Window</Text><Text style={styles.successRowValue}>{confirmedOrder.pickupTime}</Text></View>
+              <View style={styles.successRow}><Text style={styles.successRowLabel}>Payment</Text><Text style={styles.successRowValue}>{confirmedOrder.paymentMethod.toUpperCase()}</Text></View>
+              <View style={[styles.successRow, { borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 8, marginTop: 4 }]}><Text style={[styles.successRowLabel, { fontWeight: '700' }]}>Total</Text><Text style={[styles.successRowValue, { fontWeight: '900', color: '#10b981' }]}>₹{confirmedOrder.totalAmount}</Text></View>
+            </View>
+
+            <TouchableOpacity style={styles.secondaryBtn} onPress={() => { setConfirmedOrder(null); setGarments([{ id: Math.random().toString(), type: 'Shirt', gender: 'gents', measurementOption: 'none', measurementsData: {} }]); }}>
               <Text style={styles.secondaryBtnText}>Book Another Order</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.secondaryBtn, { marginTop: 8 }]} onPress={() => setTab('track')}>
-              <Text style={[styles.secondaryBtnText, { color: '#3b82f6' }]}>Track This Order →</Text>
-            </TouchableOpacity>
           </View>
-        )}
-
-        {/* ── TRACKING TAB ─────────────────────────── */}
-        {tab === 'track' && (
-          <>
-            {orders.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyIcon}>📦</Text>
-                <Text style={styles.emptyTitle}>No Orders Yet</Text>
-                <Text style={styles.emptySub}>Book a pickup to get started.</Text>
-              </View>
-            ) : (
-              orders.map(order => (
-                <View key={order.id} style={styles.trackingCard}>
-                  <View style={styles.trackingHeader}>
-                    <View>
-                      <Text style={styles.trackingRef}>{order.trackingReference}</Text>
-                      <Text style={styles.trackingDate}>{new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</Text>
-                    </View>
-                    <View style={[styles.paymentBadge, { backgroundColor: order.paymentStatus === 'cod_pending' ? '#fef3c7' : '#dcfce7' }]}>
-                      <Text style={[styles.paymentBadgeText, { color: order.paymentStatus === 'cod_pending' ? '#d97706' : '#16a34a' }]}>
-                        {order.paymentMethod === 'cod' ? 'COD' : 'PAID'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Per-garment tracking timeline */}
-                  {order.garments.map((garment, gi) => {
-                    const currentIdx = stageIndex(garment.stage);
-                    const sla = garment.slaDeadline ? MockApi.getSlaStatus(garment.slaDeadline) : null;
-                    return (
-                      <View key={garment.id} style={styles.garmentTracker}>
-                        <View style={styles.garmentTrackerHeader}>
-                          <Text style={styles.garmentTrackerTitle}>{garment.type} ({garment.gender})</Text>
-                          <Text style={styles.garmentQr}>{garment.qrCode}</Text>
-                        </View>
-                        {sla && (
-                          <View style={[styles.slaBadge, { backgroundColor: sla.color + '20' }]}>
-                            <Text style={[styles.slaText, { color: sla.color }]}>⏱ {sla.label}</Text>
-                          </View>
-                        )}
-                        <View style={styles.timeline}>
-                          {TRACKING_STAGES.filter(s => s.key !== 'rework').map((stage, si) => {
-                            const realIdx = stageIndex(stage.key);
-                            const done = currentIdx >= realIdx;
-                            const isCurrent = currentIdx === realIdx;
-                            return (
-                              <View key={stage.key} style={styles.timelineStep}>
-                                <View style={styles.timelineLeft}>
-                                  <View style={[styles.dot, done ? styles.dotDone : styles.dotPending, isCurrent && styles.dotCurrent]} />
-                                  {si < TRACKING_STAGES.filter(s => s.key !== 'rework').length - 1 && (
-                                    <View style={[styles.line, done && styles.lineDone]} />
-                                  )}
-                                </View>
-                                <Text style={[styles.stageLabel, done && styles.stageLabelDone, isCurrent && styles.stageLabelCurrent]}>
-                                  {stage.label} {isCurrent ? '←' : ''}
-                                </Text>
-                              </View>
-                            );
-                          })}
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              ))
-            )}
-          </>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -313,41 +415,64 @@ export const CustomerBookingScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#f1f5f9' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#fff' },
-  greeting: { fontSize: 13, color: '#64748b', fontWeight: '500' },
-  userName: { fontSize: 20, fontWeight: '800', color: '#1e293b' },
-  logoutBtn: { backgroundColor: '#f1f5f9', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  logoutText: { color: '#475569', fontWeight: '700', fontSize: 14 },
+  safeArea: { flex: 1, backgroundColor: '#f8fafc' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  greeting: { fontSize: 13, color: '#64748b' },
+  userName: { fontSize: 18, fontWeight: '800', color: '#1e293b' },
+  profileIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  profileIconText: { fontSize: 16 },
+  logoutBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#f1f5f9', borderRadius: 6 },
+  logoutText: { color: '#ef4444', fontWeight: '600', fontSize: 13 },
 
-  tabBar: { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-  tab: { flex: 1, paddingVertical: 14, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  activeTab: { borderBottomColor: '#3b82f6' },
-  tabText: { color: '#64748b', fontWeight: '600', fontSize: 15 },
-  activeTabText: { color: '#3b82f6', fontWeight: '800' },
+  scrollContent: { padding: 16, paddingBottom: 60 },
+  card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: '#1e293b', marginBottom: 12 },
+  inputLabel: { fontSize: 13, color: '#64748b', fontWeight: '600', marginBottom: 6, marginTop: 12 },
+  input: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 10, paddingHorizontal: 14, height: 44, color: '#1e293b' },
+  inputError: { borderColor: '#ef4444', backgroundColor: '#fef2f2' },
+  errorText: { color: '#ef4444', fontSize: 12, fontWeight: '600', marginTop: 4 },
 
-  scrollContent: { flexGrow: 1, padding: 16, paddingBottom: 60 },
+  counterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
+  counterLabel: { fontSize: 15, fontWeight: '600', color: '#1e293b' },
+  counterPrice: { fontSize: 12, color: '#64748b', marginTop: 2 },
+  counterSubtotal: { fontSize: 14, fontWeight: '700', color: '#1e293b', marginRight: 16 },
+  stepper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f1f5f9', borderRadius: 8, padding: 4 },
+  stepperBtn: { width: 28, height: 28, backgroundColor: '#fff', borderRadius: 6, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 1, elevation: 1 },
+  stepperBtnText: { fontSize: 16, fontWeight: '600', color: '#1e293b' },
+  stepperValue: { width: 24, textAlign: 'center', fontSize: 15, fontWeight: '700', color: '#1e293b' },
 
-  card: { backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
-  cardTitle: { fontSize: 17, fontWeight: '800', color: '#1e293b', marginBottom: 16 },
-  cardTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  inputLabel: { fontSize: 13, fontWeight: '600', color: '#64748b', marginBottom: 6 },
-  input: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, marginBottom: 14, color: '#1e293b' },
+  garmentDetailCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 10, padding: 12, marginBottom: 12 },
+  garmentHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  garmentIndex: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#1e293b', justifyContent: 'center', alignItems: 'center', marginRight: 8 },
+  garmentIndexText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  garmentTitleText: { fontSize: 15, fontWeight: '700', color: '#1e293b' },
+  garmentPrice: { color: '#10b981', fontSize: 14, fontWeight: '800' },
 
-  garmentRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  garmentIndex: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#1e293b', justifyContent: 'center', alignItems: 'center', marginRight: 12, marginTop: 4 },
-  garmentIndexText: { color: '#fff', fontWeight: '800', fontSize: 13 },
-  garmentFields: { flex: 1 },
   pillGroup: { flexDirection: 'row', gap: 8 },
   pill: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#f1f5f9', borderRadius: 20 },
-  activePill: { backgroundColor: '#1e293b' },
   activePillGender: { backgroundColor: '#ec4899' },
+  activePill: { backgroundColor: '#1e293b' },
   pillText: { color: '#475569', fontWeight: '600', fontSize: 13 },
   activePillText: { color: '#fff' },
-  addGarmentBtn: { backgroundColor: '#eff6ff', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
-  addGarmentText: { color: '#3b82f6', fontWeight: '700', fontSize: 14 },
-  removeBtn: { padding: 8 },
-  removeBtnText: { color: '#ef4444', fontWeight: '700', fontSize: 16 },
+
+  measurementsBox: { backgroundColor: '#f8fafc', borderRadius: 10, padding: 12 },
+  measurementsTitle: { fontSize: 13, fontWeight: '700', color: '#1e293b', marginBottom: 8 },
+  radioGroup: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 12 },
+  radioOpt: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  radioCircle: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: '#cbd5e1', alignItems: 'center', justifyContent: 'center' },
+  radioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#3b82f6' },
+  radioLabel: { fontSize: 13, color: '#475569', fontWeight: '500' },
+
+  savedBox: { backgroundColor: '#fff', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' },
+  savedTitle: { fontSize: 13, fontWeight: '700', color: '#1e293b', marginBottom: 6 },
+  savedData: { fontSize: 12, color: '#64748b', lineHeight: 18 },
+
+  newMeasurementsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  measurementField: { width: '48%', marginBottom: 8 },
+  measurementLabel: { fontSize: 12, color: '#64748b', fontWeight: '500', marginBottom: 4 },
+  measurementInput: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 6, height: 36, paddingHorizontal: 10, fontSize: 14 },
+  
+  noMeasurementsHelp: { fontSize: 12, color: '#f59e0b', fontStyle: 'italic', marginTop: 4 },
 
   paymentRow: { flexDirection: 'row', gap: 12 },
   payBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: '#e2e8f0', alignItems: 'center' },
@@ -371,39 +496,9 @@ const styles = StyleSheet.create({
   refBox: { backgroundColor: '#f8fafc', padding: 16, borderRadius: 12, width: '100%', alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' },
   refLabel: { fontSize: 12, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
   refValue: { fontSize: 20, fontWeight: '900', color: '#1e293b', letterSpacing: 2 },
-  garmentsSummary: { color: '#64748b', fontSize: 13, textAlign: 'center', marginBottom: 24 },
+  successRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  successRowLabel: { fontSize: 14, color: '#64748b', fontWeight: '500' },
+  successRowValue: { fontSize: 14, color: '#1e293b', fontWeight: '600' },
   secondaryBtn: { backgroundColor: '#f8fafc', paddingVertical: 14, paddingHorizontal: 24, borderRadius: 12, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
   secondaryBtnText: { color: '#475569', fontSize: 15, fontWeight: '700' },
-
-  emptyState: { alignItems: 'center', paddingVertical: 60 },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: '#1e293b', marginBottom: 8 },
-  emptySub: { fontSize: 14, color: '#64748b' },
-
-  trackingCard: { backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
-  trackingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  trackingRef: { fontSize: 16, fontWeight: '800', color: '#1e293b' },
-  trackingDate: { color: '#94a3b8', fontSize: 13, marginTop: 2 },
-  paymentBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  paymentBadgeText: { fontWeight: '800', fontSize: 12 },
-
-  garmentTracker: { marginBottom: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#f8fafc' },
-  garmentTrackerHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  garmentTrackerTitle: { fontSize: 15, fontWeight: '700', color: '#1e293b' },
-  garmentQr: { fontSize: 12, color: '#94a3b8', fontFamily: 'Courier' },
-  slaBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginBottom: 12, alignSelf: 'flex-start' },
-  slaText: { fontSize: 12, fontWeight: '700' },
-
-  timeline: { paddingLeft: 4 },
-  timelineStep: { flexDirection: 'row', alignItems: 'flex-start', minHeight: 32 },
-  timelineLeft: { alignItems: 'center', marginRight: 12, width: 16 },
-  dot: { width: 12, height: 12, borderRadius: 6, marginTop: 3 },
-  dotPending: { backgroundColor: '#e2e8f0', borderWidth: 2, borderColor: '#cbd5e1' },
-  dotDone: { backgroundColor: '#10b981' },
-  dotCurrent: { backgroundColor: '#3b82f6', width: 14, height: 14, borderRadius: 7 },
-  line: { width: 2, flex: 1, minHeight: 16, backgroundColor: '#e2e8f0', marginTop: 2 },
-  lineDone: { backgroundColor: '#10b981' },
-  stageLabel: { fontSize: 14, color: '#94a3b8', paddingTop: 1, paddingBottom: 12, fontWeight: '500' },
-  stageLabelDone: { color: '#475569' },
-  stageLabelCurrent: { color: '#3b82f6', fontWeight: '800' },
 });

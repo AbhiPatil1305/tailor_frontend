@@ -60,8 +60,8 @@ export const MockApi = {
   // ── Customer ──────────────────────────────────────────────────────────────
   bookOrder: async (orderData: {
     customerName?: string; customerPhone?: string; customerAddress?: string;
-    pickupSlot?: string; paymentMethod?: 'cod' | 'online';
-    garments: { type: string; gender: 'ladies'|'gents'|'kids'|'unisex'; notes?: string }[];
+    pickupDate?: string; pickupTime?: string; paymentMethod?: 'cod' | 'online';
+    garments: { type: string; gender: 'ladies'|'gents'|'kids'|'unisex'; notes?: string; measurements?: any }[];
   }): Promise<Order> => {
     const orderId = genId('ord');
     const paymentMethod = orderData.paymentMethod || 'cod';
@@ -69,34 +69,42 @@ export const MockApi = {
       const id = genId('grm');
       const payout = g.type === 'Shirt' ? 150 : g.type === 'Trousers' ? 180 : g.type === 'Kurta' ? 200 : g.type === 'Suit' ? 500 : 160;
       const service = Math.round(payout * 1.6);
+      const qrCode = `T24-GRM-${id.slice(-6).toUpperCase()}`;
+      
+      // Duplicate QR Protection
+      const exists = store.orders.some(o => o.garments.some(existingG => existingG.qrCode === qrCode));
+      if (exists) throw new Error(`Duplicate QR Code generated: ${qrCode}`);
+
       const garment: Garment = {
         id, orderId, customerId: 'c1', hubId: 'h1',
         type: g.type, gender: g.gender,
         serviceCharge: service, payoutAmount: payout,
-        qrCode: `T24-GRM-${id.slice(-6).toUpperCase()}`,
+        qrCode,
         stage: 'booked', notes: g.notes,
+        measurements: g.measurements,
         createdAt: new Date().toISOString(),
       };
       appendEvent(id, 'GARMENT_CREATED', null, 'booked', 'c1', 'customer', 'h1');
       return garment;
     });
 
-    const newOrder: Order = {
+    const order: Order = {
       id: orderId,
       customerId: 'c1',
-      customerName: orderData.customerName || 'Ravi Kumar',
-      customerPhone: orderData.customerPhone || '9000000001',
-      customerAddress: orderData.customerAddress || '12, Gandhi Nagar, Bidar',
-      pickupSlot: orderData.pickupSlot || 'Tomorrow 10–11 AM',
+      customerName: orderData.customerName,
+      customerPhone: orderData.customerPhone,
+      customerAddress: orderData.customerAddress,
+      pickupDate: orderData.pickupDate,
+      pickupTime: orderData.pickupTime,
+      trackingReference: `TRK-${orderId.slice(-6).toUpperCase()}`,
       paymentMethod,
-      paymentStatus: paymentMethod === 'cod' ? 'cod_pending' : 'pending',
-      totalAmount: garments.reduce((s, g) => s + g.serviceCharge, 0),
-      trackingReference: `T24-ORD-${1010 + store.orders.length}`,
+      paymentStatus: paymentMethod === 'cod' ? 'cod_pending' : 'paid',
       garments,
+      totalAmount: garments.reduce((s, g) => s + g.serviceCharge, 0),
       createdAt: new Date().toISOString(),
     };
-    store.orders.push(newOrder);
-    return newOrder;
+    store.orders.push(order);
+    return order;
   },
 
   getOrders: async (): Promise<Order[]> => [...store.orders],
@@ -105,8 +113,13 @@ export const MockApi = {
   // ── Garments ──────────────────────────────────────────────────────────────
   getAllGarments: async (): Promise<Garment[]> => store.orders.flatMap(o => o.garments),
 
-  getGarmentsByHub: async (hubId: string): Promise<Garment[]> =>
-    store.orders.flatMap(o => o.garments).filter(g => g.hubId === hubId),
+  getGarmentsByHub: async (hubId: string): Promise<Garment[]> => {
+    return store.orders.flatMap(o => o.garments.filter(g => g.hubId === hubId));
+  },
+
+  getAuditTrail: async (garmentId: string): Promise<GarmentEvent[]> => {
+    return store.events.filter(e => e.garmentId === garmentId).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  },
 
   getGarmentByQR: async (qrCode: string): Promise<Garment | null> => {
     for (const order of store.orders) {
@@ -362,5 +375,57 @@ export const MockApi = {
       stageQueues[stage] = all.filter(g => g.stage === stage).length;
     }
     return { inProduction, deliveredToday, atRisk, pendingClaims, codPending, stageQueues };
+  },
+
+  // ── Measurements ──
+  getCustomerSavedMeasurements: async (customerId: string) => {
+    // We mocked customerSavedMeasurements inside DemoState, but since DemoState object might not have it exported globally in the same way,
+    // let's access it via store.
+    return (store as any).customerSavedMeasurements?.[customerId] || {};
+  },
+
+  saveCustomerMeasurements: async (customerId: string, type: string, data: Record<string, any>) => {
+    if (!(store as any).customerSavedMeasurements) (store as any).customerSavedMeasurements = {};
+    if (!(store as any).customerSavedMeasurements[customerId]) (store as any).customerSavedMeasurements[customerId] = {};
+    (store as any).customerSavedMeasurements[customerId][type] = data;
+  },
+
+  requestClarification: async (garmentId: string, issue: string, message: string, requestedBy: string) => {
+    const order = store.orders.find(o => o.garments.some(g => g.id === garmentId));
+    if (!order) throw new Error('Order not found');
+    const garment = order.garments.find(g => g.id === garmentId);
+    if (!garment) throw new Error('Garment not found');
+
+    if (!garment.measurements) {
+      garment.measurements = { version: 1, status: 'NOT_PROVIDED', source: 'NEW', data: {} };
+    }
+    garment.measurements.status = 'NEEDS_CLARIFICATION';
+    garment.measurements.clarificationRequest = {
+      issue,
+      message,
+      requestedBy,
+      requestedAt: new Date().toISOString()
+    };
+    appendEvent(garmentId, 'MEASUREMENTS_CLARIFICATION_REQUESTED', garment.stage, garment.stage, requestedBy, 'hub/tailor', garment.hubId);
+  },
+
+  submitClarification: async (garmentId: string, data: Record<string, any>, confirmedBy: string) => {
+    const order = store.orders.find(o => o.garments.some(g => g.id === garmentId));
+    if (!order) throw new Error('Order not found');
+    const garment = order.garments.find(g => g.id === garmentId);
+    if (!garment) throw new Error('Garment not found');
+
+    if (!garment.measurements) {
+      garment.measurements = { version: 0, status: 'NOT_PROVIDED', source: 'CLARIFICATION', data: {} };
+    }
+    garment.measurements.version += 1;
+    garment.measurements.status = 'CONFIRMED';
+    garment.measurements.source = 'CLARIFICATION';
+    garment.measurements.data = data;
+    garment.measurements.confirmedAt = new Date().toISOString();
+    garment.measurements.confirmedBy = confirmedBy;
+    garment.measurements.clarificationRequest = undefined;
+    
+    appendEvent(garmentId, 'MEASUREMENTS_CONFIRMED', garment.stage, garment.stage, confirmedBy, 'customer', garment.hubId);
   },
 };

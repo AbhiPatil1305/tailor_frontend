@@ -10,6 +10,7 @@ import { Garment } from '../../../domain/models/types';
 export const RiderDeliveryScreen = () => {
   const { logout, userName, userId } = useAuth();
   const [garments, setGarments] = useState<Garment[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
 
   // OTP modal
   const [otpModalVisible, setOtpModalVisible] = useState(false);
@@ -21,6 +22,8 @@ export const RiderDeliveryScreen = () => {
 
   const loadData = async () => {
     const data = await MockApi.getAllGarments();
+    const allOrders = await MockApi.getOrders();
+    setOrders(allOrders);
     setGarments(data.filter(g => g.stage === 'dispatched' || g.stage === 'out_for_delivery'));
   };
 
@@ -94,6 +97,7 @@ export const RiderDeliveryScreen = () => {
         keyExtractor={item => item.id}
         renderItem={({ item }) => {
           const isOutForDelivery = item.stage === 'out_for_delivery';
+          const order = orders.find(o => o.id === item.orderId);
           return (
             <View style={[styles.card, { borderLeftColor: isOutForDelivery ? '#f97316' : '#6366f1' }]}>
               <View style={styles.cardHeader}>
@@ -112,15 +116,15 @@ export const RiderDeliveryScreen = () => {
                 </View>
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Customer</Text>
-                  <Text style={styles.infoValue}>Ravi Kumar</Text>
+                  <Text style={styles.infoValue}>{order?.customerName || 'Ravi Kumar'}</Text>
                 </View>
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Address</Text>
-                  <Text style={styles.infoValue}>12, Gandhi Nagar, Bidar</Text>
+                  <Text style={styles.infoValue}>{order?.customerAddress || '12, Gandhi Nagar, Bidar'}</Text>
                 </View>
                 <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Category</Text>
-                  <Text style={styles.infoValue}>{item.gender.toUpperCase()}</Text>
+                  <Text style={styles.infoLabel}>Payment</Text>
+                  <Text style={styles.infoValue}>{order?.paymentMethod === 'cod' ? (order?.paymentStatus === 'cod_pending' ? 'COD (To Collect)' : 'PAID') : 'PAID ONLINE'}</Text>
                 </View>
               </View>
 

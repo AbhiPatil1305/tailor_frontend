@@ -4,9 +4,10 @@ import {
 } from 'react-native';
 import { useAuth } from '../../../core/auth/AuthContext';
 import { MockApi } from '../../../infrastructure/api/MockApi';
-import { Garment, Tailor, LeaveRequest, PayoutClaim, GenderCategory, TailorScore, Hub } from '../../../domain/models/types';
+import { Garment, Tailor, LeaveRequest, PayoutClaim, GenderCategory, TailorScore, Hub, Order } from '../../../domain/models/types';
 
-type TabType = 'garments' | 'tailors' | 'approvals' | 'dashboard';
+type TabType = 'dashboard' | 'scanner' | 'garments' | 'tailors' | 'approvals';
+
 
 export const HubManagerDashboard = () => {
   const { logout, role, userName, userId, hubId: authHubId, setHubId } = useAuth();
@@ -36,6 +37,11 @@ export const HubManagerDashboard = () => {
   const [assignGarment, setAssignGarment] = useState<Garment | null>(null);
   const [assignScores, setAssignScores] = useState<TailorScore[]>([]);
 
+  // Audit trail modal
+  const [auditModalVisible, setAuditModalVisible] = useState(false);
+  const [auditEvents, setAuditEvents] = useState<any[]>([]);
+  const [auditGarment, setAuditGarment] = useState<Garment | null>(null);
+
   useEffect(() => { loadData(); }, []);
   useEffect(() => { loadData(); }, [selectedHubId]);
 
@@ -56,6 +62,53 @@ export const HubManagerDashboard = () => {
     setHubs(h);
   };
 
+  // Scanner state (Staff only)
+  const [scanInput, setScanInput] = useState('');
+  const [scannedGarment, setScannedGarment] = useState<Garment | null>(null);
+  const [scannedGarmentOrder, setScannedGarmentOrder] = useState<Order | null>(null);
+  const [scanError, setScanError] = useState('');
+
+  const handleScan = async () => {
+    setScanError('');
+    setScannedGarment(null);
+    setScannedGarmentOrder(null);
+    if (!scanInput.trim()) {
+      setScanError('Please scan or enter a QR code.');
+      return;
+    }
+    const garment = await MockApi.getGarmentByQR(scanInput.trim());
+    if (!garment) {
+      setScanError('Garment not found.');
+      return;
+    }
+    if (garment.hubId !== selectedHubId) {
+      setScanError('This garment belongs to another hub.');
+      return;
+    }
+    if (garment.stage === 'delivered') {
+      setScanError('This garment has already been delivered.');
+      return;
+    }
+    
+    const order = await MockApi.getOrderById(garment.orderId);
+    setScannedGarment(garment);
+    if (order) setScannedGarmentOrder(order);
+  };
+
+  const advanceScannedStage = async (newStage: any) => {
+    if (!scannedGarment) return;
+    try {
+      await MockApi.advanceGarmentStage(scannedGarment.qrCode, newStage, userId || 'staff', role || 'hub_staff');
+      Alert.alert('Success', `Garment moved to ${formatStage(newStage)}`);
+      setScanInput('');
+      setScannedGarment(null);
+      setScannedGarmentOrder(null);
+      loadData();
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
+  };
+
   const advanceStage = async (qr: string, stage: any) => {
     try {
       await MockApi.advanceGarmentStage(qr, stage, userId || 'staff', role || 'hub_staff');
@@ -63,6 +116,13 @@ export const HubManagerDashboard = () => {
     } catch (e: any) {
       Alert.alert('Invalid Action', e.message);
     }
+  };
+
+  const openAudit = async (garment: Garment) => {
+    const ev = await MockApi.getAuditTrail(garment.id);
+    setAuditGarment(garment);
+    setAuditEvents(ev);
+    setAuditModalVisible(true);
   };
 
   const openSmartAssign = (garment: Garment) => {
@@ -97,6 +157,9 @@ export const HubManagerDashboard = () => {
     try {
       await MockApi.recordQC(reworkGarment.qrCode, 'rework', userId || 'staff', reworkReason);
       setReworkModalVisible(false);
+      if (scannedGarment?.id === reworkGarment.id) {
+        setScannedGarment(null); setScanInput('');
+      }
       setReworkGarment(null);
       loadData();
       Alert.alert('Rework Sent', `Garment returned to stitching queue.\nReason: ${reworkReason}`);
@@ -108,6 +171,9 @@ export const HubManagerDashboard = () => {
   const confirmQcPass = async (garment: Garment) => {
     try {
       await MockApi.recordQC(garment.qrCode, 'pass', userId || 'staff');
+      if (scannedGarment?.id === garment.id) {
+        setScannedGarment(null); setScanInput('');
+      }
       loadData();
     } catch (e: any) {
       Alert.alert('Error', e.message);
@@ -157,7 +223,7 @@ export const HubManagerDashboard = () => {
 
       {/* Tabs */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll}>
-        {(isManager ? ['dashboard','garments','tailors','approvals'] : ['garments']).map(t => (
+        {(isManager ? ['dashboard','garments','tailors','approvals'] : ['dashboard', 'scanner']).map(t => (
           <TouchableOpacity key={t} style={[styles.tab, activeTab === t && styles.activeTab]} onPress={() => setActiveTab(t as TabType)}>
             <Text style={[styles.tabText, activeTab === t && styles.activeTabText]}>
               {t === 'approvals' ? `Approvals${pendingApprovals > 0 ? ` 🔴` : ''}` : t.charAt(0).toUpperCase() + t.slice(1)}
@@ -172,56 +238,160 @@ export const HubManagerDashboard = () => {
         {activeTab === 'dashboard' && dashboard && (
           <>
             <View style={styles.metricsGrid}>
-              {[
-                { label: 'In Production', value: dashboard.inProduction, color: '#3b82f6' },
-                { label: 'Delivered Today', value: dashboard.deliveredToday, color: '#10b981' },
-                { label: 'At Risk / Overdue', value: dashboard.atRisk, color: '#ef4444' },
-                { label: 'COD Pending', value: dashboard.codPending, color: '#f59e0b' },
-                { label: 'Pending Claims', value: dashboard.pendingClaims, color: '#8b5cf6' },
-              ].map(m => (
-                <View key={m.label} style={[styles.metricCard, { borderTopColor: m.color }]}>
-                  <Text style={[styles.metricValue, { color: m.color }]}>{m.value}</Text>
-                  <Text style={styles.metricLabel}>{m.label}</Text>
+              <View style={[styles.metricCard, { borderTopColor: '#3b82f6' }]}>
+                <Text style={styles.metricVal}>{dashboard.inProduction}</Text>
+                <Text style={styles.metricLabel}>In Production</Text>
+              </View>
+              <View style={[styles.metricCard, { borderTopColor: '#10b981' }]}>
+                <Text style={styles.metricVal}>{dashboard.deliveredToday}</Text>
+                <Text style={styles.metricLabel}>Delivered Today</Text>
+              </View>
+              <View style={[styles.metricCard, { borderTopColor: '#ef4444' }]}>
+                <Text style={[styles.metricVal, { color: '#ef4444' }]}>{dashboard.atRisk}</Text>
+                <Text style={styles.metricLabel}>SLA at Risk</Text>
+              </View>
+              {isManager && (
+                <View style={[styles.metricCard, { borderTopColor: '#f59e0b' }]}>
+                  <Text style={styles.metricVal}>{dashboard.codPending}</Text>
+                  <Text style={styles.metricLabel}>COD Pending</Text>
                 </View>
-              ))}
+              )}
             </View>
 
-            <Text style={styles.sectionHeader}>Station Queues</Text>
-            {Object.entries(dashboard.stageQueues).map(([stage, count]) => (
-              <View key={stage} style={styles.queueRow}>
-                <Text style={styles.queueStage}>{formatStage(stage)}</Text>
-                <View style={styles.queueBarContainer}>
-                  <View style={[styles.queueBar, { width: `${Math.min(100, ((count as number) / 5) * 100)}%` }]} />
+            <Text style={styles.sectionTitle}>Live Station Queues</Text>
+            {Object.entries(dashboard.stageQueues).filter(([s]) => ['intake','cutting','stitching','qc','rework','ironing','packed','dispatched'].includes(s)).map(([stage, count]) => (
+              <View key={stage} style={styles.queueCard}>
+                <View style={styles.queueRow}>
+                  <Text style={styles.queueStage}>{formatStage(stage)} <Text style={styles.queueCountBadge}>({count as number})</Text></Text>
                 </View>
-                <Text style={styles.queueCount}>{count as number}</Text>
+                
+                {/* Expanded Queue List */}
+                {(count as number) > 0 && garments.filter(g => g.stage === stage).map(g => (
+                  <View key={g.id} style={styles.queueItemRow}>
+                    <View>
+                      <Text style={styles.queueItemTitle}>{g.qrCode}</Text>
+                      <Text style={styles.queueItemSub}>{g.type} ({g.gender}) • Order {g.orderId.replace('ord_', '')}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.queueItemSub}>{g.assignedTailorId ? `✂️ ${tailors.find(t=>t.id===g.assignedTailorId)?.name || g.assignedTailorId}` : ''}</Text>
+                      {g.measurements?.status === 'CONFIRMED' && <Text style={{ color: '#10b981', fontSize: 10, fontWeight: '700' }}>✓ MEASUREMENTS</Text>}
+                      {g.measurements?.status === 'NEEDS_CLARIFICATION' && <Text style={{ color: '#ef4444', fontSize: 10, fontWeight: '700' }}>⚠ CLARIFY</Text>}
+                      <Text style={[styles.queueItemSub, { color: '#f59e0b', fontSize: 11 }]}>{getSlaLabel(g.slaDeadline)?.label || ''}</Text>
+                    </View>
+                  </View>
+                ))}
               </View>
             ))}
           </>
         )}
 
-        {/* ── GARMENTS TAB ─────────────────────────── */}
-        {activeTab === 'garments' && (
-          <>
-            {isManager && (
-              <View style={styles.filterPills}>
-                {(['ladies', 'gents', 'kids', 'unisex'] as GenderCategory[]).map(g => (
-                  <TouchableOpacity key={g} style={[styles.pill, genderTab === g && styles.activePill]} onPress={() => setGenderTab(g)}>
-                    <Text style={[styles.pillText, genderTab === g && styles.activePillText]}>{g.toUpperCase()}</Text>
+        {/* ── SCANNER TAB (STAFF) ──────────────────── */}
+        {activeTab === 'scanner' && !isManager && (
+          <View style={styles.scannerContainer}>
+            <View style={styles.scannerInputBox}>
+                  <Text style={styles.scannerIcon}>📷</Text>
+                  <TextInput
+                    style={styles.scannerInput}
+                    placeholder="Scan or Enter QR (e.g. T24-GRM-XXXXXX)"
+                    value={scanInput}
+                    onChangeText={setScanInput}
+                    autoCapitalize="characters"
+                  />
+                  <TouchableOpacity style={styles.scanBtn} onPress={handleScan}>
+                    <Text style={styles.scanBtnText}>Lookup</Text>
                   </TouchableOpacity>
-                ))}
+                </View>
+
+                {scanError ? (
+                  <View style={styles.errorBox}>
+                    <Text style={styles.errorIcon}>⚠️</Text>
+                    <Text style={styles.errorText}>{scanError}</Text>
+                  </View>
+                ) : null}
+
+                {scannedGarment && (
+                  <View style={styles.scannedCard}>
+                    <Text style={styles.scannedTitle}>Garment Found</Text>
+                    <View style={styles.scannedDetailRow}>
+                      <Text style={styles.scannedDetailLabel}>QR Code:</Text>
+                      <Text style={styles.scannedDetailValue}>{scannedGarment.qrCode}</Text>
+                    </View>
+                    <View style={styles.scannedDetailRow}>
+                      <Text style={styles.scannedDetailLabel}>Garment:</Text>
+                      <Text style={styles.scannedDetailValue}>{scannedGarment.type} ({scannedGarment.gender})</Text>
+                    </View>
+                    <View style={styles.scannedDetailRow}>
+                      <Text style={styles.scannedDetailLabel}>Customer:</Text>
+                      <Text style={styles.scannedDetailValue}>{scannedGarmentOrder?.customerName} ({scannedGarmentOrder?.trackingReference})</Text>
+                    </View>
+                    <View style={styles.scannedDetailRow}>
+                      <Text style={styles.scannedDetailLabel}>Current Stage:</Text>
+                      <Text style={[styles.scannedDetailValue, { color: '#8b5cf6', fontWeight: '800' }]}>{formatStage(scannedGarment.stage)}</Text>
+                    </View>
+
+                    <Text style={styles.availableActionLabel}>Available Action:</Text>
+
+                    {scannedGarment.stage === 'booked' && (
+                      <TouchableOpacity style={styles.actionBtn} onPress={() => advanceScannedStage('intake')}>
+                        <Text style={styles.actionBtnText}>📷 CONFIRM INTAKE</Text>
+                      </TouchableOpacity>
+                    )}
+                    {scannedGarment.stage === 'intake' && (
+                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#f59e0b' }]} onPress={() => advanceScannedStage('cutting')}>
+                        <Text style={styles.actionBtnText}>✂️ START CUTTING</Text>
+                      </TouchableOpacity>
+                    )}
+                    {scannedGarment.stage === 'cutting' && (
+                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#3b82f6' }]} onPress={() => advanceScannedStage('stitching')}>
+                        <Text style={styles.actionBtnText}>✂️ COMPLETE CUTTING</Text>
+                      </TouchableOpacity>
+                    )}
+                    {scannedGarment.stage === 'qc' && (
+                      <View style={styles.qcActions}>
+                        <TouchableOpacity style={[styles.qcBtn, styles.qcPassBtn]} onPress={() => confirmQcPass(scannedGarment)}>
+                          <Text style={styles.qcBtnText}>✓ QC Pass → Ironing</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.qcBtn, styles.qcReworkBtn]} onPress={() => openRework(scannedGarment)}>
+                          <Text style={styles.qcBtnText}>↩ Rework</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    {scannedGarment.stage === 'rework' && (
+                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#f59e0b' }]} onPress={() => advanceScannedStage('stitching')}>
+                        <Text style={styles.actionBtnText}>↩ Return to Stitching</Text>
+                      </TouchableOpacity>
+                    )}
+                    {scannedGarment.stage === 'ironing' && (
+                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#10b981' }]} onPress={() => advanceScannedStage('packed')}>
+                        <Text style={styles.actionBtnText}>📦 Pack Garment</Text>
+                      </TouchableOpacity>
+                    )}
+                    {scannedGarment.stage === 'packed' && (
+                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#6366f1' }]} onPress={() => advanceScannedStage('dispatched')}>
+                        <Text style={styles.actionBtnText}>🚚 Dispatch to Hub</Text>
+                      </TouchableOpacity>
+                    )}
+                    {!['booked', 'intake', 'cutting', 'qc', 'rework', 'ironing', 'packed'].includes(scannedGarment.stage) && (
+                      <Text style={styles.noActionText}>No staff action available at this stage.</Text>
+                    )}
+                  </View>
+                )}
               </View>
             )}
 
-            {!isManager && (
-              <View style={styles.staffHero}>
-                <Text style={styles.staffHeroIcon}>📷</Text>
-                <Text style={styles.staffHeroTitle}>Hub Station Workflow</Text>
-                <Text style={styles.staffHeroSub}>Scan garment QR or select action below</Text>
-              </View>
-            )}
+        {/* ── GARMENTS TAB (MANAGER) ───────────────── */}
+        {activeTab === 'garments' && isManager && (
+          <>
+            <View style={styles.filterPills}>
+              {(['ladies', 'gents', 'kids', 'unisex'] as GenderCategory[]).map(g => (
+                <TouchableOpacity key={g} style={[styles.pill, genderTab === g && styles.activePill]} onPress={() => setGenderTab(g)}>
+                  <Text style={[styles.pillText, genderTab === g && styles.activePillText]}>{g.toUpperCase()}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             {garments
-              .filter(g => isManager ? g.gender === genderTab : true)
+              .filter(g => g.gender === genderTab)
               .map(item => {
                 const sla = getSlaLabel(item.slaDeadline);
                 const assignedTailor = tailors.find(t => t.id === item.assignedTailorId);
@@ -245,48 +415,24 @@ export const HubManagerDashboard = () => {
                         <Text style={[styles.slaTagText, { color: sla.color }]}>⏱ {sla.label}</Text>
                       </View>
                     )}
-
-                    {/* Hub Staff actions */}
-                    {!isManager && item.stage === 'booked' && (
-                      <TouchableOpacity style={styles.actionBtn} onPress={() => advanceStage(item.qrCode, 'intake')}>
-                        <Text style={styles.actionBtnText}>📷 Scan Intake QR</Text>
-                      </TouchableOpacity>
-                    )}
-                    {!isManager && item.stage === 'intake' && (
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#f59e0b' }]} onPress={() => advanceStage(item.qrCode, 'cutting')}>
-                        <Text style={styles.actionBtnText}>✂️ Move to Cutting</Text>
-                      </TouchableOpacity>
-                    )}
-                    {!isManager && item.stage === 'qc' && (
-                      <View style={styles.qcActions}>
-                        <TouchableOpacity style={[styles.qcBtn, styles.qcPassBtn]} onPress={() => confirmQcPass(item)}>
-                          <Text style={styles.qcBtnText}>✓ QC Pass → Ironing</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.qcBtn, styles.qcReworkBtn]} onPress={() => openRework(item)}>
-                          <Text style={styles.qcBtnText}>↩ Rework</Text>
-                        </TouchableOpacity>
+                    
+                    {item.measurements && (
+                      <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center' }}>
+                         <Text style={{ fontSize: 12, fontWeight: '600', color: item.measurements.status === 'CONFIRMED' ? '#10b981' : item.measurements.status === 'NEEDS_CLARIFICATION' ? '#ef4444' : '#f59e0b' }}>
+                           {item.measurements.status === 'CONFIRMED' ? '✓ Measurements Confirmed' : item.measurements.status === 'NEEDS_CLARIFICATION' ? '⚠ Clarification Pending' : 'Measurements Draft'}
+                         </Text>
                       </View>
-                    )}
-                    {!isManager && item.stage === 'rework' && (
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#f59e0b' }]} onPress={() => advanceStage(item.qrCode, 'stitching')}>
-                        <Text style={styles.actionBtnText}>↩ Return to Stitching</Text>
-                      </TouchableOpacity>
-                    )}
-                    {!isManager && item.stage === 'ironing' && (
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#10b981' }]} onPress={() => advanceStage(item.qrCode, 'packed')}>
-                        <Text style={styles.actionBtnText}>📦 Pack Garment</Text>
-                      </TouchableOpacity>
-                    )}
-                    {!isManager && item.stage === 'packed' && (
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#6366f1' }]} onPress={() => advanceStage(item.qrCode, 'dispatched')}>
-                        <Text style={styles.actionBtnText}>🚚 Dispatch</Text>
-                      </TouchableOpacity>
                     )}
 
                     {/* Manager actions */}
                     {isManager && item.stage === 'cutting' && (
                       <TouchableOpacity style={styles.smartAssignBtn} onPress={() => openSmartAssign(item)}>
                         <Text style={styles.smartAssignBtnText}>✨ Smart Assign Tailor</Text>
+                      </TouchableOpacity>
+                    )}
+                    {isManager && (
+                      <TouchableOpacity style={[styles.smartAssignBtn, { backgroundColor: '#f1f5f9', marginTop: 8 }]} onPress={() => openAudit(item)}>
+                        <Text style={[styles.smartAssignBtnText, { color: '#475569' }]}>📋 View Audit Trail</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -330,7 +476,7 @@ export const HubManagerDashboard = () => {
         {/* ── APPROVALS TAB ──────────────────────────── */}
         {activeTab === 'approvals' && (
           <>
-            <Text style={styles.sectionHeader}>Leave Requests</Text>
+            <Text style={styles.sectionTitle}>Leave Requests</Text>
             {leaveRequests.filter(l => l.status === 'pending').length === 0
               ? <Text style={styles.emptyText}>No pending leave requests.</Text>
               : leaveRequests.filter(l => l.status === 'pending').map(l => (
@@ -346,7 +492,7 @@ export const HubManagerDashboard = () => {
               ))
             }
 
-            <Text style={[styles.sectionHeader, { marginTop: 24 }]}>Payout Claims (Step 1 of 2)</Text>
+            <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Payout Claims (Step 1 of 2)</Text>
             {payoutClaims.filter(p => p.hubManagerApproval === 'pending').length === 0
               ? <Text style={styles.emptyText}>No pending payout claims.</Text>
               : payoutClaims.filter(p => p.hubManagerApproval === 'pending').map(p => (
@@ -435,6 +581,37 @@ export const HubManagerDashboard = () => {
         </View>
       </Modal>
 
+      {/* ── Audit Trail Modal ────────────────────────── */}
+      <Modal visible={auditModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Garment Audit Trail</Text>
+            {auditGarment && (
+              <Text style={styles.modalSub}>{auditGarment.type} — {auditGarment.qrCode}</Text>
+            )}
+            <ScrollView style={{ width: '100%', maxHeight: 400, marginVertical: 10 }}>
+              {auditEvents.map((ev, idx) => (
+                <View key={idx} style={{ flexDirection: 'row', marginBottom: 16 }}>
+                  <View style={{ alignItems: 'center', marginRight: 12 }}>
+                    <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#3b82f6', marginTop: 4 }} />
+                    {idx < auditEvents.length - 1 && <View style={{ flex: 1, width: 2, backgroundColor: '#e2e8f0', marginVertical: 4 }} />}
+                  </View>
+                  <View style={{ flex: 1, paddingBottom: 4 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#1e293b' }}>{formatStage(ev.newStage)}</Text>
+                    <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                      By {ev.performedByRole.toUpperCase()} • {new Date(ev.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setAuditModalVisible(false)}>
+              <Text style={styles.cancelBtnText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* ── Hub Picker Modal ───────────────────────── */}
       <Modal visible={hubPickerVisible} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
@@ -490,21 +667,41 @@ const styles = StyleSheet.create({
   scrollContent: { flexGrow: 1, padding: 16, paddingBottom: 60 },
 
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 },
-  metricCard: { width: '47%', backgroundColor: '#fff', borderRadius: 12, padding: 16, borderTopWidth: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 },
-  metricValue: { fontSize: 28, fontWeight: '900', marginBottom: 4 },
-  metricLabel: { fontSize: 12, color: '#64748b', fontWeight: '600' },
-  sectionHeader: { fontSize: 16, fontWeight: '800', color: '#1e293b', marginBottom: 12 },
-  queueRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 },
-  queueStage: { width: 120, fontSize: 12, fontWeight: '600', color: '#475569' },
-  queueBarContainer: { flex: 1, height: 8, backgroundColor: '#e2e8f0', borderRadius: 4 },
-  queueBar: { height: 8, backgroundColor: '#8b5cf6', borderRadius: 4 },
-  queueCount: { width: 24, fontSize: 13, fontWeight: '800', color: '#1e293b', textAlign: 'right' },
+  metricCard: { flex: 1, minWidth: '45%', backgroundColor: '#fff', padding: 16, borderRadius: 12, borderTopWidth: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  metricVal: { fontSize: 28, fontWeight: '900', color: '#1e293b', marginBottom: 4 },
+  metricLabel: { fontSize: 13, color: '#64748b', fontWeight: '600' },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#1e293b', marginBottom: 12, marginTop: 8 },
+
+  queueCard: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#f1f5f9' },
+  queueRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  queueStage: { fontSize: 16, fontWeight: '700', color: '#334155', textTransform: 'capitalize' },
+  queueCountBadge: { color: '#64748b', fontWeight: '800', fontSize: 14 },
+  queueItemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
+  queueItemTitle: { fontSize: 14, fontWeight: '700', color: '#1e293b' },
+  queueItemSub: { fontSize: 12, color: '#64748b', marginTop: 2 },
 
   filterPills: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   pill: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#e2e8f0', borderRadius: 20 },
   activePill: { backgroundColor: '#1e293b' },
   pillText: { color: '#475569', fontWeight: '600', fontSize: 12 },
   activePillText: { color: '#fff' },
+
+  scannerContainer: { backgroundColor: '#fff', borderRadius: 16, padding: 24, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
+  scannerInputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4 },
+  scannerIcon: { fontSize: 24, marginRight: 8 },
+  scannerInput: { flex: 1, height: 48, fontSize: 16, color: '#1e293b', fontWeight: '600' },
+  scanBtn: { backgroundColor: '#1e293b', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8 },
+  scanBtnText: { color: '#fff', fontWeight: '700' },
+  errorBox: { backgroundColor: '#fef2f2', padding: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', marginTop: 16 },
+  errorIcon: { fontSize: 16, marginRight: 8 },
+  errorText: { color: '#ef4444', fontWeight: '600', fontSize: 14 },
+  scannedCard: { marginTop: 24, borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 20 },
+  scannedTitle: { fontSize: 18, fontWeight: '800', color: '#1e293b', marginBottom: 16 },
+  scannedDetailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  scannedDetailLabel: { fontSize: 14, color: '#64748b', fontWeight: '500' },
+  scannedDetailValue: { fontSize: 15, color: '#1e293b', fontWeight: '700' },
+  availableActionLabel: { fontSize: 13, color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginTop: 16, marginBottom: 8, letterSpacing: 1 },
+  noActionText: { color: '#64748b', fontStyle: 'italic', textAlign: 'center', marginTop: 12 },
 
   staffHero: { backgroundColor: '#1e293b', borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 16 },
   staffHeroIcon: { fontSize: 36, marginBottom: 8 },

@@ -81,7 +81,14 @@ function makeGarment(opts: {
     stage: opts.stage,
     assignedTailorId: opts.assignedTailorId,
     intakeTime, slaDeadline, createdAt,
-    measurements: '38-32-standard',
+    measurements: {
+      version: 1,
+      status: 'CONFIRMED',
+      source: 'SAVED',
+      data: { Chest: 38, Length: 32 },
+      confirmedAt: createdAt,
+      confirmedBy: opts.customerId
+    },
     notes: opts.notes || '',
   };
 }
@@ -178,42 +185,42 @@ export function buildDemoState() {
     {
       id: 'ord_001', customerId: 'c1', customerName: 'Ravi Kumar',
       customerPhone: '9000000001', customerAddress: '12, Gandhi Nagar, Bidar',
-      pickupSlot: 'Tomorrow 10–11 AM', paymentMethod: 'cod', paymentStatus: 'cod_pending',
+      pickupDate: 'Tomorrow', pickupTime: '10:00 AM – 12:00 PM', paymentMethod: 'cod', paymentStatus: 'cod_pending',
       totalAmount: 660, trackingReference: 'T24-ORD-1001',
       createdAt: hoursAgo(22), garments: [g001, g002],
     },
     {
       id: 'ord_002', customerId: 'c2', customerName: 'Meena Desai',
       customerPhone: '9000000002', customerAddress: '45, MG Road, Bidar',
-      pickupSlot: 'Today 2–3 PM', paymentMethod: 'online', paymentStatus: 'paid',
+      pickupDate: 'Today', pickupTime: '02:00 PM – 04:00 PM', paymentMethod: 'online', paymentStatus: 'paid',
       totalAmount: 360, trackingReference: 'T24-ORD-1002',
       createdAt: hoursAgo(10), garments: [g003, g004],
     },
     {
       id: 'ord_003', customerId: 'c3', customerName: 'Arjun Singh',
       customerPhone: '9000000003', customerAddress: '7, Station Road, Bidar',
-      pickupSlot: 'Today 4–5 PM', paymentMethod: 'cod', paymentStatus: 'cod_pending',
+      pickupDate: 'Today', pickupTime: '05:00 PM – 07:00 PM', paymentMethod: 'cod', paymentStatus: 'cod_pending',
       totalAmount: 480, trackingReference: 'T24-ORD-1003',
       createdAt: hoursAgo(14), garments: [g005, g006],
     },
     {
       id: 'ord_004', customerId: 'c1', customerName: 'Ravi Kumar',
       customerPhone: '9000000001', customerAddress: '12, Gandhi Nagar, Bidar',
-      pickupSlot: 'Yesterday 10–11 AM', paymentMethod: 'cod', paymentStatus: 'cod_collected',
+      pickupDate: 'Yesterday', pickupTime: '10:00 AM – 12:00 PM', paymentMethod: 'cod', paymentStatus: 'cod_collected',
       totalAmount: 330, trackingReference: 'T24-ORD-1000',
       createdAt: hoursAgo(28), garments: [g007],
     },
     {
       id: 'ord_005', customerId: 'c4', customerName: 'Sita Devi',
       customerPhone: '9000000004', customerAddress: '88, Old Town, Bidar',
-      pickupSlot: 'Today 9–10 AM', paymentMethod: 'online', paymentStatus: 'pending',
+      pickupDate: 'Today', pickupTime: '10:00 AM – 12:00 PM', paymentMethod: 'online', paymentStatus: 'pending',
       totalAmount: 440, trackingReference: 'T24-ORD-1004',
       createdAt: hoursAgo(25), garments: [g008, g009],
     },
     {
       id: 'ord_006', customerId: 'c5', customerName: 'Anjali Rao',
       customerPhone: '9000000005', customerAddress: '22, Indira Nagar, Bengaluru',
-      pickupSlot: 'Today 11–12 PM', paymentMethod: 'cod', paymentStatus: 'cod_pending',
+      pickupDate: 'Today', pickupTime: '10:00 AM – 12:00 PM', paymentMethod: 'cod', paymentStatus: 'cod_pending',
       totalAmount: 360, trackingReference: 'T24-ORD-1005',
       createdAt: hoursAgo(9), garments: [g010, g011],
     },
@@ -252,7 +259,19 @@ export function buildDemoState() {
     },
   ];
 
-  const qcRecords: QCRecord[] = [];
+  // ── Customer Saved Measurements ──
+  const customerSavedMeasurements: Record<string, Record<string, any>> = {
+    c1: {
+      'Shirt': {
+        'Chest': 40,
+        'Shoulder': 18,
+        'Sleeve': 24,
+        'Length': 28,
+        'Waist': 36
+      }
+    }
+  };
 
-  return { hubs, tailors, orders, events, ledger, leaveRequests, payoutClaims, qcRecords };
+  const qcRecords: QCRecord[] = [];
+  return { hubs, tailors, orders, events, ledger, leaveRequests, payoutClaims, qcRecords, customerSavedMeasurements };
 }
