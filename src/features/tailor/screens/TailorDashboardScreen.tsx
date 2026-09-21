@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  Alert, SafeAreaView, Modal, TextInput
+  Alert, SafeAreaView, Modal, TextInput, Platform
 } from 'react-native';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { useAuth } from '../../../core/auth/AuthContext';
 import { MockApi } from '../../../infrastructure/api/MockApi';
 import { Garment, Tailor, PayoutLedger } from '../../../domain/models/types';
@@ -81,6 +83,45 @@ export const TailorDashboardScreen = () => {
 
   const shareLocation = () => {
     Alert.alert('Location Shared', 'Your live location is now visible to the Hub Manager.');
+  };
+
+  const downloadApplicationPDF = async () => {
+    if (!tailor) return;
+    const html = `
+      <html>
+        <body style="font-family: Helvetica, Arial, sans-serif; padding: 40px; color: #1e293b;">
+          <h1 style="color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">TAILOR24 Partner Application</h1>
+          <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+          <h2>Applicant Information</h2>
+          <table style="width: 100%; text-align: left; margin-bottom: 20px;">
+            <tr><th style="padding: 8px 0;">Name:</th><td>${tailor.name}</td></tr>
+            <tr><th style="padding: 8px 0;">ID:</th><td>${tailor.id}</td></tr>
+            <tr><th style="padding: 8px 0;">Gender Specialization:</th><td>${tailor.gender.toUpperCase()}</td></tr>
+            <tr><th style="padding: 8px 0;">Rating:</th><td>★ ${tailor.rating}</td></tr>
+          </table>
+          <h2>Skills & Capabilities</h2>
+          <ul>
+            ${tailor.specialisations.map(s => `<li>${s.charAt(0).toUpperCase() + s.slice(1)}</li>`).join('')}
+          </ul>
+          <p><strong>Daily Capacity:</strong> ${tailor.capacityPerDay} garments per day</p>
+          <div style="margin-top: 60px;">
+            <p>___________________________</p>
+            <p>Applicant Signature</p>
+          </div>
+        </body>
+      </html>
+    `;
+    try {
+      const { uri } = await Print.printToFileAsync({ html });
+      if (Platform.OS === 'web') {
+        // Web downloads automatically when printed
+        Print.printAsync({ html });
+      } else {
+        await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+      }
+    } catch (e: any) {
+      Alert.alert('Error', 'Failed to generate PDF: ' + e.message);
+    }
   };
 
   const ledgerStatusColor = (status: string) => {
@@ -184,6 +225,12 @@ export const TailorDashboardScreen = () => {
             <TouchableOpacity style={styles.quickBtn} onPress={shareLocation}>
               <Text style={styles.quickBtnIcon}>📍</Text>
               <Text style={styles.quickBtnText}>Share Location</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={[styles.actionRow, { marginTop: -8, marginBottom: 20 }]}>
+            <TouchableOpacity style={styles.quickBtn} onPress={downloadApplicationPDF}>
+              <Text style={styles.quickBtnIcon}>📄</Text>
+              <Text style={styles.quickBtnText}>Download Application PDF</Text>
             </TouchableOpacity>
           </View>
 

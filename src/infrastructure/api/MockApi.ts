@@ -67,11 +67,12 @@ export const MockApi = {
     const paymentMethod = orderData.paymentMethod || 'cod';
     const garments: Garment[] = orderData.garments.map((g, i) => {
       const id = genId('grm');
-      const payout = g.type === 'Shirt' ? 150 : g.type === 'Trousers' ? 180 : g.type === 'Kurta' ? 200 : 160;
+      const payout = g.type === 'Shirt' ? 150 : g.type === 'Trousers' ? 180 : g.type === 'Kurta' ? 200 : g.type === 'Suit' ? 500 : 160;
+      const service = Math.round(payout * 1.6);
       const garment: Garment = {
         id, orderId, customerId: 'c1', hubId: 'h1',
         type: g.type, gender: g.gender,
-        serviceCharge: 120, payoutAmount: payout,
+        serviceCharge: service, payoutAmount: payout,
         qrCode: `T24-GRM-${id.slice(-6).toUpperCase()}`,
         stage: 'booked', notes: g.notes,
         createdAt: new Date().toISOString(),

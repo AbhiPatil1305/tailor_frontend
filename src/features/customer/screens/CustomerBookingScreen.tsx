@@ -36,6 +36,7 @@ export const CustomerBookingScreen = () => {
   const [customerPhone, setCustomerPhone] = useState('9000000001');
   const [customerAddress, setCustomerAddress] = useState('12, Gandhi Nagar, Bidar');
   const [garments, setGarments] = useState([{ type: 'Shirt', gender: 'gents' as const }]);
+  const [pickupSlot, setPickupSlot] = useState('Tomorrow 10:00–11:00 AM');
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'online'>('cod');
   const [loading, setLoading] = useState(false);
 
@@ -65,11 +66,15 @@ export const CustomerBookingScreen = () => {
       Alert.alert('Missing Details', 'Please fill in your name, phone, and address.');
       return;
     }
+    if (!pickupSlot) {
+      Alert.alert('Missing Slot', 'Please select a pickup slot.');
+      return;
+    }
     setLoading(true);
     try {
       const order = await MockApi.bookOrder({
         customerName, customerPhone, customerAddress,
-        pickupSlot: 'Tomorrow 10–11 AM',
+        pickupSlot,
         paymentMethod,
         garments: garments as any,
       });
@@ -183,13 +188,32 @@ export const CustomerBookingScreen = () => {
               </View>
             </View>
 
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Pickup Slot</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.pillGroup}>
+                  {['Tomorrow 10:00–11:00 AM', 'Tomorrow 12:00–01:00 PM', 'Tomorrow 02:00–03:00 PM', 'Tomorrow 04:00–05:00 PM'].map(slot => (
+                    <TouchableOpacity key={slot} style={[styles.pill, pickupSlot === slot && styles.activePill]} onPress={() => setPickupSlot(slot)}>
+                      <Text style={[styles.pillText, pickupSlot === slot && styles.activePillText]}>{slot.replace('Tomorrow ', '')}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryText}>Pickup: Tomorrow 10–11 AM</Text>
-              <Text style={styles.summaryAmount}>₹{garments.length * 120}</Text>
+              <Text style={styles.summaryText}>Pickup: {pickupSlot.split(' ')[0]} {pickupSlot.split(' ')[1]}</Text>
+              <Text style={styles.summaryAmount}>₹{garments.reduce((sum, g) => {
+                const payout = g.type === 'Shirt' ? 150 : g.type === 'Trousers' ? 180 : g.type === 'Kurta' ? 200 : g.type === 'Suit' ? 500 : 160;
+                return sum + Math.round(payout * 1.6);
+              }, 0)}</Text>
             </View>
 
             <TouchableOpacity style={[styles.primaryBtn, loading && styles.primaryBtnDisabled]} onPress={handleBook} disabled={loading}>
-              <Text style={styles.primaryBtnText}>{loading ? 'Booking...' : `Confirm Booking (₹${garments.length * 120})`}</Text>
+              <Text style={styles.primaryBtnText}>{loading ? 'Booking...' : `Confirm Booking (₹${garments.reduce((sum, g) => {
+                const payout = g.type === 'Shirt' ? 150 : g.type === 'Trousers' ? 180 : g.type === 'Kurta' ? 200 : g.type === 'Suit' ? 500 : 160;
+                return sum + Math.round(payout * 1.6);
+              }, 0)})`}</Text>
             </TouchableOpacity>
           </>
         )}
