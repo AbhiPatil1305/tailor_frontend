@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, SafeAreaView, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, SafeAreaView, ScrollView, TextInput } from 'react-native';
 import { MockApi } from '../../../infrastructure/api/MockApi';
 import { Order, Garment } from '../../../domain/models/types';
 import { SLAIndicator } from '../../../shared/components/SLAIndicator';
@@ -19,6 +19,32 @@ export const CustomerTrackingScreen = ({ selectedRef }: Props) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [clarificationData, setClarificationData] = useState<Record<string, Record<string, string>>>({});
+
+  const submitClarification = async (garment: Garment) => {
+    const data = clarificationData[garment.id];
+    if (!data || Object.keys(data).length === 0) return;
+    await MockApi.submitClarification(garment.id, data, 'c1');
+    
+    // refresh
+    const updatedOrders = await MockApi.getOrders();
+    const myOrders = updatedOrders.filter((o: Order) => o.customerId === 'c1').reverse();
+    setOrders(myOrders);
+    setSelectedOrder(myOrders.find(o => o.id === selectedOrder?.id) || null);
+    setClarificationData(prev => {
+      const next = {...prev};
+      delete next[garment.id];
+      return next;
+    });
+  };
+
+  const updateClarificationField = (garmentId: string, key: string, val: string) => {
+    setClarificationData(prev => ({
+      ...prev,
+      [garmentId]: { ...(prev[garmentId] || {}), [key]: val }
+    }));
+  };
+
 
   useEffect(() => {
     MockApi.getOrders().then((data: Order[]) => {
@@ -105,9 +131,49 @@ export const CustomerTrackingScreen = ({ selectedRef }: Props) => {
               <Text style={s.garmentQr}>{g.qrCode}</Text>
             </View>
             <SLAIndicator slaDeadline={g.slaDeadline} compact />
+
             <View style={[s.stagePill, { marginTop: 8 }]}>
               <Text style={s.stagePillText}>{STAGE_LABELS[g.stage] || g.stage}</Text>
             </View>
+
+            {g.measurements?.status === 'NEEDS_CLARIFICATION' && g.measurements.clarificationRequest && (
+              <View style={{ backgroundColor: '#fef2f2', padding: 12, borderRadius: 8, marginTop: 12, borderWidth: 1, borderColor: '#fca5a5' }}>
+                <Text style={{ color: '#b91c1c', fontWeight: '800', marginBottom: 4 }}>⚠ Measurement Clarification Required</Text>
+                <Text style={{ color: '#7f1d1d', fontSize: 13, marginBottom: 8 }}>
+                  Tailor says: "{g.measurements.clarificationRequest.message}"
+                </Text>
+                
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                  {['Chest', 'Shoulder', 'Sleeve', 'Length', 'Waist', 'Hip', 'Thigh', 'Bottom', 'Bust'].map(f => {
+                     const relevant = ['Shirt', 'Kurta'].includes(g.type) ? ['Chest', 'Shoulder', 'Sleeve', 'Length'] : 
+                                      ['Trousers'].includes(g.type) ? ['Waist', 'Hip', 'Length', 'Thigh', 'Bottom'] : 
+                                      ['Suit'].includes(g.type) ? ['Chest', 'Shoulder', 'Sleeve', 'Length', 'Waist', 'Hip'] :
+                                      ['Chest', 'Shoulder', 'Sleeve', 'Length', 'Waist'];
+                     if (!relevant.includes(f)) return null;
+
+                     return (
+                       <View key={f} style={{ width: '45%', marginBottom: 8 }}>
+                         <Text style={{ fontSize: 11, color: '#7f1d1d', fontWeight: '600', marginBottom: 4 }}>{f}</Text>
+                         <TextInput 
+                           style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: '#fca5a5', borderRadius: 6, height: 32, paddingHorizontal: 8, fontSize: 13, color: '#1e293b' }}
+                           placeholder={String(g.measurements?.data?.[f] || 'in')}
+                           keyboardType="numeric"
+                           value={clarificationData[g.id]?.[f] || ''}
+                           onChangeText={(v) => updateClarificationField(g.id, f, v)}
+                         />
+                       </View>
+                     )
+                  })}
+                </View>
+                <TouchableOpacity 
+                  style={{ backgroundColor: '#b91c1c', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginTop: 12 }}
+                  onPress={() => submitClarification(g)}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>CONFIRM FINAL MEASUREMENTS</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
           </View>
         ))}
       </ScrollView>

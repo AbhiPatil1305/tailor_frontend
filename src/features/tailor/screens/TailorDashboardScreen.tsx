@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  Alert, SafeAreaView, Modal, TextInput
+  Alert, SafeAreaView, Modal, TextInput, Platform
 } from 'react-native';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { useAuth } from '../../../core/auth/AuthContext';
 import { MockApi } from '../../../infrastructure/api/MockApi';
 import { Garment, Tailor, PayoutLedger } from '../../../domain/models/types';
@@ -18,6 +20,22 @@ export const TailorDashboardScreen = () => {
 
   // Leave modal
   const [leaveModalVisible, setLeaveModalVisible] = useState(false);
+  const [clarificationModalVisible, setClarificationModalVisible] = useState(false);
+  const [clarifyGarmentId, setClarifyGarmentId] = useState('');
+  const [clarifyMessage, setClarifyMessage] = useState('');
+
+  const submitClarification = async () => {
+    if (!clarifyMessage.trim()) return;
+    try {
+      await MockApi.requestClarification(clarifyGarmentId, 'Other', clarifyMessage, tailor?.name || 'Tailor');
+      setClarificationModalVisible(false);
+      setClarifyMessage('');
+      loadData();
+      Alert.alert('Clarification Requested', 'The customer has been notified.');
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
+  };
   const [leaveDate, setLeaveDate] = useState('');
   const [leaveReason, setLeaveReason] = useState('');
 
@@ -81,6 +99,45 @@ export const TailorDashboardScreen = () => {
 
   const shareLocation = () => {
     Alert.alert('Location Shared', 'Your live location is now visible to the Hub Manager.');
+  };
+
+  const downloadApplicationPDF = async () => {
+    if (!tailor) return;
+    const html = `
+      <html>
+        <body style="font-family: Helvetica, Arial, sans-serif; padding: 40px; color: #1e293b;">
+          <h1 style="color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">TAILOR24 Partner Application</h1>
+          <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+          <h2>Applicant Information</h2>
+          <table style="width: 100%; text-align: left; margin-bottom: 20px;">
+            <tr><th style="padding: 8px 0;">Name:</th><td>${tailor.name}</td></tr>
+            <tr><th style="padding: 8px 0;">ID:</th><td>${tailor.id}</td></tr>
+            <tr><th style="padding: 8px 0;">Gender Specialization:</th><td>${tailor.gender.toUpperCase()}</td></tr>
+            <tr><th style="padding: 8px 0;">Rating:</th><td>★ ${tailor.rating}</td></tr>
+          </table>
+          <h2>Skills & Capabilities</h2>
+          <ul>
+            ${tailor.specialisations.map(s => `<li>${s.charAt(0).toUpperCase() + s.slice(1)}</li>`).join('')}
+          </ul>
+          <p><strong>Daily Capacity:</strong> ${tailor.capacityPerDay} garments per day</p>
+          <div style="margin-top: 60px;">
+            <p>___________________________</p>
+            <p>Applicant Signature</p>
+          </div>
+        </body>
+      </html>
+    `;
+    try {
+      const { uri } = await Print.printToFileAsync({ html });
+      if (Platform.OS === 'web') {
+        // Web downloads automatically when printed
+        Print.printAsync({ html });
+      } else {
+        await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+      }
+    } catch (e: any) {
+      Alert.alert('Error', 'Failed to generate PDF: ' + e.message);
+    }
   };
 
   const ledgerStatusColor = (status: string) => {
@@ -186,6 +243,12 @@ export const TailorDashboardScreen = () => {
               <Text style={styles.quickBtnText}>Share Location</Text>
             </TouchableOpacity>
           </View>
+          <View style={[styles.actionRow, { marginTop: -8, marginBottom: 20 }]}>
+            <TouchableOpacity style={styles.quickBtn} onPress={downloadApplicationPDF}>
+              <Text style={styles.quickBtnIcon}>📄</Text>
+              <Text style={styles.quickBtnText}>Download Application PDF</Text>
+            </TouchableOpacity>
+          </View>
 
           <Text style={styles.sectionTitle}>
             {tab === 'queue' ? `Stitching Queue (${garments.length})` : `Payout Ledger (${ledger.length})`}
@@ -213,11 +276,48 @@ export const TailorDashboardScreen = () => {
                     </View>
                   );
                 })()}
+                {/* Measurements Block */}
+                <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, marginVertical: 12 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <Text style={{ fontWeight: '700', color: '#1e293b' }}>Measurements</Text>
+                    {g.measurements?.status === 'CONFIRMED' && <Text style={{ color: '#10b981', fontWeight: '800', fontSize: 12 }}>✓ CONFIRMED (v{g.measurements.version})</Text>}
+                    {g.measurements?.status === 'NEEDS_CLARIFICATION' && <Text style={{ color: '#f59e0b', fontWeight: '800', fontSize: 12 }}>⚠ WAITING FOR CUSTOMER</Text>}
+                    {(!g.measurements || g.measurements.status === 'NOT_PROVIDED') && <Text style={{ color: '#ef4444', fontWeight: '800', fontSize: 12 }}>⚠ NOT PROVIDED</Text>}
+                  </View>
+                  
+                  {g.measurements?.status === 'CONFIRMED' && g.measurements.data && (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {Object.entries(g.measurements.data).map(([k, v]) => (
+                        <View key={k} style={{ backgroundColor: '#fff', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                          <Text style={{ fontSize: 11, color: '#64748b' }}>{k}</Text>
+                          <Text style={{ fontSize: 13, color: '#1e293b', fontWeight: '600' }}>{String(v)}"</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  
+                  {(!g.measurements || g.measurements.status !== 'CONFIRMED') && (
+                     <TouchableOpacity 
+                       style={{ backgroundColor: '#fef2f2', padding: 8, borderRadius: 6, borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', marginTop: 4 }}
+                       onPress={() => {
+                         setClarifyGarmentId(g.id);
+                         setClarificationModalVisible(true);
+                       }}
+                     >
+                       <Text style={{ color: '#ef4444', fontWeight: '700', fontSize: 12 }}>REQUEST CLARIFICATION</Text>
+                     </TouchableOpacity>
+                  )}
+                </View>
+
                 <View style={styles.taskActions}>
                   <TouchableOpacity style={styles.callBtn} onPress={callCustomer}>
                     <Text style={styles.callBtnText}>📞 Call</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.finishBtn} onPress={() => advanceStage(g.qrCode)}>
+                  <TouchableOpacity 
+                    style={[styles.finishBtn, (!g.measurements || g.measurements.status !== 'CONFIRMED') && { backgroundColor: '#94a3b8' }]} 
+                    onPress={() => advanceStage(g.qrCode)}
+                    disabled={!g.measurements || g.measurements.status !== 'CONFIRMED'}
+                  >
                     <Text style={styles.finishBtnText}>Finish → QC ✓</Text>
                   </TouchableOpacity>
                 </View>
@@ -254,6 +354,30 @@ export const TailorDashboardScreen = () => {
           </View>
         }
       />
+
+      {/* Clarification Modal */}
+      <Modal visible={clarificationModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Request Clarification</Text>
+            <Text style={styles.inputLabel}>Message to Customer</Text>
+            <TextInput
+              style={[styles.input, { height: 80 }]}
+              multiline
+              placeholder="e.g. Please confirm sleeve length, 50 inches seems incorrect."
+              value={clarifyMessage}
+              onChangeText={setClarifyMessage}
+            />
+            
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setClarificationModalVisible(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.submitBtn} onPress={submitClarification}>
+                <Text style={styles.submitBtnText}>Send Request</Text>
+              </TouchableOpacity>
+                      </View>
+        </View>
+      </Modal>
 
       {/* Leave Modal */}
       <Modal visible={leaveModalVisible} animationType="slide" transparent>
