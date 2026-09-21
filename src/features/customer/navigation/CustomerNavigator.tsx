@@ -1,10 +1,11 @@
 import React, { useRef, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text, View } from 'react-native';
+import { Text, View, TouchableOpacity } from 'react-native';
 import { CustomerHomeScreen } from '../screens/CustomerHomeScreen';
 import { CustomerBookingScreen } from '../screens/CustomerBookingScreen';
 import { CustomerOrdersScreen } from '../screens/CustomerOrdersScreen';
 import { CustomerTrackingScreen } from '../screens/CustomerTrackingScreen';
+import { CustomerAIChatScreen } from '../screens/CustomerAIChatScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -30,12 +31,17 @@ export const CustomerNavigator = () => {
     >
       <Tab.Screen
         name="CHome"
-        options={{ tabBarIcon: ({ focused }: any) => <TabIcon icon="🏠" label="Home" focused={focused} /> }}
+        options={{ 
+    tabBarLabel: () => null,
+    tabBarButton: (props: any) => <TouchableOpacity activeOpacity={0.8} {...props} />,
+    tabBarIcon: ({ focused }: any) => <TabIcon icon="🏠" label="Home" focused={focused} /> 
+  }}
       >
         {({ navigation }: any) => (
           <CustomerHomeScreen
             onBookPress={() => navigation.navigate('CBook')}
             onTrackPress={() => navigation.navigate('CTrack')}
+            onAIPress={() => navigation.navigate('CAssistant')}
           />
         )}
       </Tab.Screen>
@@ -43,12 +49,20 @@ export const CustomerNavigator = () => {
       <Tab.Screen
         name="CBook"
         component={CustomerBookingScreen}
-        options={{ tabBarIcon: ({ focused }: any) => <TabIcon icon="✂️" label="Book" focused={focused} /> }}
+        options={{ 
+    tabBarLabel: () => null,
+    tabBarButton: (props: any) => <TouchableOpacity activeOpacity={0.8} {...props} />,
+    tabBarIcon: ({ focused }: any) => <TabIcon icon="✂️" label="Book" focused={focused} /> 
+  }}
       />
 
       <Tab.Screen
         name="COrders"
-        options={{ tabBarIcon: ({ focused }: any) => <TabIcon icon="📦" label="Orders" focused={focused} /> }}
+        options={{ 
+    tabBarLabel: () => null,
+    tabBarButton: (props: any) => <TouchableOpacity activeOpacity={0.8} {...props} />,
+    tabBarIcon: ({ focused }: any) => <TabIcon icon="📦" label="Orders" focused={focused} /> 
+  }}
       >
         {({ navigation }: any) => (
           <CustomerOrdersScreen
@@ -59,10 +73,24 @@ export const CustomerNavigator = () => {
 
       <Tab.Screen
         name="CTrack"
-        options={{ tabBarIcon: ({ focused }: any) => <TabIcon icon="📍" label="Track" focused={focused} /> }}
+        options={{ 
+    tabBarLabel: () => null,
+    tabBarButton: (props: any) => <TouchableOpacity activeOpacity={0.8} {...props} />,
+    tabBarIcon: ({ focused }: any) => <TabIcon icon="📍" label="Track" focused={focused} /> 
+  }}
       >
         {() => <CustomerTrackingScreen selectedRef={trackRef} />}
       </Tab.Screen>
+
+      <Tab.Screen
+        name="CAssistant"
+        component={CustomerAIChatScreen}
+        options={{ 
+    tabBarLabel: () => null,
+    tabBarButton: (props: any) => <TouchableOpacity activeOpacity={0.8} {...props} />,
+    tabBarIcon: ({ focused }: any) => <TabIcon icon="🤖" label="AI" focused={focused} /> 
+  }}
+      />
     </Tab.Navigator>
   );
 };

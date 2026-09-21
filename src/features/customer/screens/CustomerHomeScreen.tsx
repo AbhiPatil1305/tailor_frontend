@@ -5,9 +5,10 @@ import { useAuth } from '../../../core/auth/AuthContext';
 interface Props {
   onBookPress: () => void;
   onTrackPress: () => void;
+  onAIPress: () => void;
 }
 
-export const CustomerHomeScreen = ({ onBookPress, onTrackPress }: Props) => {
+export const CustomerHomeScreen = ({ onBookPress, onTrackPress, onAIPress }: Props) => {
   const { userName, logout } = useAuth();
   return (
     <SafeAreaView style={s.safe}>
@@ -36,6 +37,9 @@ export const CustomerHomeScreen = ({ onBookPress, onTrackPress }: Props) => {
         </TouchableOpacity>
         <TouchableOpacity style={s.secondaryBtn} onPress={onTrackPress}>
           <Text style={s.secondaryBtnText}>📍  Track My Order</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.secondaryBtn, { borderColor: '#3b82f6', backgroundColor: '#eff6ff' }]} onPress={onAIPress}>
+          <Text style={[s.secondaryBtnText, { color: '#3b82f6' }]}>🤖  Book via AI Assistant (Beta)</Text>
         </TouchableOpacity>
 
         {/* Trust indicators */}

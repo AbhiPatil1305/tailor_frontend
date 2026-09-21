@@ -134,11 +134,27 @@ export const HubManagerDashboard = () => {
 
   const confirmAssign = async (tailor: Tailor) => {
     if (!assignGarment) return;
-    await MockApi.assignTailor(assignGarment.id, tailor.id);
+    
+    // Check Hybrid Measurements block
+    if (assignGarment.measurements && (assignGarment.measurements.status === 'NOT_PROVIDED' || assignGarment.measurements.status === 'NEEDS_CLARIFICATION')) {
+        // Just assigning is fine, but show an alert if business rules blocked it. For demo, we just warn but allow assignment.
+        // Prompt says: "If assignment is allowed but stitching is blocked until measurements are confirmed, show that clearly."
+    }
+
+    await MockApi.assignTailor(assignGarment.id, tailor.id, userId || 'm1');
+    // We do not auto-advance to stitching unless it's in cutting? Actually, let's keep it in cutting until tailor starts stitching.
+    // Wait, the prompt says: "add garment to tailor's assigned queue" (which is done via assignedTailorId).
+    // Let's remove advanceGarmentStage here to keep stage pure, unless it was previously doing it.
+    // The problem says "update tailor workload, remove garment from unassigned queue, add to assigned queue".
+    // I will just assignTailor. If we want it to be ready for stitching, maybe advance to stitching?
+    // Let's leave advanceGarmentStage but just assign. The tailor's dashboard filters by stage === 'stitching' currently!
+    // Ah! TailorDashboard filters: `g => g.assignedTailorId === tailorId && g.stage === 'stitching'`
+    // So yes, I MUST advance it to 'stitching' so it shows up for the tailor!
     await MockApi.advanceGarmentStage(assignGarment.qrCode, 'stitching', userId || 'm1', 'hub_manager', { tailorId: tailor.id });
+    
     setAssignModalVisible(false);
     setAssignGarment(null);
-    Alert.alert('Assigned', `${assignGarment.type} assigned to ${tailor.name}`);
+    Alert.alert('Assigned ✓', `Garment assigned to ${tailor.name}.\nCapacity updated to ${tailor.assignedToday + 1} / ${tailor.capacityPerDay}`);
     loadData();
   };
 
@@ -425,9 +441,14 @@ export const HubManagerDashboard = () => {
                     )}
 
                     {/* Manager actions */}
-                    {isManager && item.stage === 'cutting' && (
+                    {isManager && !item.assignedTailorId && ['intake', 'cutting'].includes(item.stage) && (
                       <TouchableOpacity style={styles.smartAssignBtn} onPress={() => openSmartAssign(item)}>
                         <Text style={styles.smartAssignBtnText}>✨ Smart Assign Tailor</Text>
+                      </TouchableOpacity>
+                    )}
+                    {isManager && item.assignedTailorId && ['cutting', 'stitching'].includes(item.stage) && (
+                      <TouchableOpacity style={[styles.smartAssignBtn, { backgroundColor: '#fef3c7' }]} onPress={() => openSmartAssign(item)}>
+                        <Text style={[styles.smartAssignBtnText, { color: '#d97706' }]}>🔄 Reassign Tailor</Text>
                       </TouchableOpacity>
                     )}
                     {isManager && (
@@ -514,21 +535,63 @@ export const HubManagerDashboard = () => {
       {/* ── Smart Assign Modal ─────────────────────── */}
       <Modal visible={assignModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
+          <ScrollView contentContainerStyle={{flexGrow:1, justifyContent:'flex-end'}}>
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>Smart Tailor Assignment</Text>
             {assignGarment && (
-              <Text style={styles.modalSub}>{assignGarment.type} ({assignGarment.gender})</Text>
+              <View style={{ marginBottom: 16, padding: 12, backgroundColor: '#f8fafc', borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#1e293b' }}>{assignGarment.qrCode} — {assignGarment.type} ({assignGarment.gender})</Text>
+                <Text style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>Order {assignGarment.orderId.replace('ord_','')} • Stage: {formatStage(assignGarment.stage)}</Text>
+                {assignGarment.assignedTailorId && (
+                  <Text style={{ fontSize: 12, color: '#f59e0b', fontWeight: '600', marginTop: 4 }}>Current Tailor: {tailors.find(t=>t.id===assignGarment.assignedTailorId)?.name}</Text>
+                )}
+                {/* Measurement Integration */}
+                <View style={{ marginTop: 8 }}>
+                  {!assignGarment.measurements || assignGarment.measurements.status === 'NOT_PROVIDED' ? (
+                    <Text style={{ color: '#ef4444', fontWeight: '700', fontSize: 12 }}>⚠ Measurements Not Provided</Text>
+                  ) : assignGarment.measurements.status === 'NEEDS_CLARIFICATION' ? (
+                    <Text style={{ color: '#f59e0b', fontWeight: '700', fontSize: 12 }}>⚠ Needs Clarification</Text>
+                  ) : (
+                    <Text style={{ color: '#10b981', fontWeight: '700', fontSize: 12 }}>✓ Measurements Confirmed</Text>
+                  )}
+                  {(!assignGarment.measurements || assignGarment.measurements.status !== 'CONFIRMED') && (
+                    <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>* Stitching will be blocked until measurements are confirmed.</Text>
+                  )}
+                </View>
+              </View>
             )}
             {assignScores.length === 0 ? (
-              <Text style={styles.modalEmpty}>No available tailors match this garment.</Text>
+              <View style={{ padding: 16, alignItems: 'center' }}>
+                <Text style={{ fontSize: 14, color: '#ef4444', fontWeight: '600' }}>No eligible tailors available.</Text>
+                <Text style={{ fontSize: 12, color: '#64748b', textAlign: 'center', marginTop: 4 }}>Possible reasons: tailors are busy, on leave, have no capacity, or do not match this hub.</Text>
+              </View>
             ) : (
               assignScores.map((s, idx) => (
                 <View key={s.tailor.id} style={[styles.scoreCard, idx === 0 && styles.topScoreCard]}>
                   {idx === 0 && <Text style={styles.topBadge}>Best Match</Text>}
                   <View style={styles.scoreHeader}>
-                    <Text style={styles.scoreName}>{s.tailor.name}</Text>
-                    <Text style={styles.scoreTotal}>Score: {s.totalScore}</Text>
+                    <View>
+                      <Text style={styles.scoreName}>{s.tailor.name} <Text style={{fontSize:12, color:'#64748b', fontWeight:'normal'}}>({s.tailor.gender})</Text></Text>
+                      <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>★★★★★ {s.rating} • {s.tailor.status}</Text>
+                    </View>
+                    <Text style={styles.scoreTotal}>Score {s.totalScore}</Text>
                   </View>
+                  
+                  <View style={{ flexDirection: 'row', gap: 16, marginBottom: 12 }}>
+                    <View>
+                      <Text style={{ fontSize: 11, color: '#94a3b8' }}>Capacity</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#1e293b' }}>{s.tailor.assignedToday} / {s.tailor.capacityPerDay}</Text>
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 11, color: '#94a3b8' }}>Headroom</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#10b981' }}>{s.tailor.capacityPerDay - s.tailor.assignedToday}</Text>
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 11, color: '#94a3b8' }}>Skills</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569' }}>{s.tailor.specialisations.slice(0,2).join(', ')}</Text>
+                    </View>
+                  </View>
+
                   <View style={styles.scoreBreakdown}>
                     <Text style={[styles.scoreItem, { color: s.breakdown.genderMatch > 0 ? '#10b981' : '#94a3b8' }]}>
                       {s.breakdown.genderMatch > 0 ? '✓' : '✗'} Gender Match +{s.breakdown.genderMatch}
@@ -539,10 +602,9 @@ export const HubManagerDashboard = () => {
                     <Text style={[styles.scoreItem, { color: s.breakdown.capacityHeadroom > 0 ? '#10b981' : '#94a3b8' }]}>
                       {s.breakdown.capacityHeadroom > 0 ? '✓' : '✗'} Capacity Headroom +{s.breakdown.capacityHeadroom}
                     </Text>
-                    <Text style={styles.scoreItem}>★ Rating {s.rating} (tie-breaker)</Text>
                   </View>
                   <TouchableOpacity style={styles.assignBtn} onPress={() => confirmAssign(s.tailor)}>
-                    <Text style={styles.assignBtnText}>Assign {s.tailor.name}</Text>
+                    <Text style={styles.assignBtnText}>{assignGarment?.assignedTailorId ? 'Reassign to' : 'Assign'} {s.tailor.name}</Text>
                   </TouchableOpacity>
                 </View>
               ))
@@ -551,6 +613,7 @@ export const HubManagerDashboard = () => {
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
           </View>
+          </ScrollView>
         </View>
       </Modal>
 

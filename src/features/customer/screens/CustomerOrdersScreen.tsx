@@ -96,7 +96,7 @@ const s = StyleSheet.create({
   count: { fontSize: 14, color: '#94a3b8', fontWeight: '600' },
   list: { flexGrow: 1, padding: 16, paddingTop: 4, paddingBottom: 40 },
   listEmpty: { flex: 1 },
-  card: { backgroundColor: '#fff', borderRadius: 16, marginBottom: 14, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
+  card: { backgroundColor: '#fff', borderRadius: 16, marginBottom: 14, overflow: 'hidden', elevation: 2 },
   cardTop: { padding: 16, paddingBottom: 12 },
   refRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   ref: { fontSize: 15, fontWeight: '800', color: '#1e293b' },
