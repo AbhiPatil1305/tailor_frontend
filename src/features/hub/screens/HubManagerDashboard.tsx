@@ -4,16 +4,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../core/auth/AuthContext';
-<<<<<<< HEAD
-import { MockApi } from '../../../infrastructure/api/MockApi';
+import { ApiClient as MockApi } from '../../../infrastructure/api/ApiClient';
 import { Garment, Tailor, LeaveRequest, PayoutClaim, GenderCategory, TailorScore, Hub, Order } from '../../../domain/models/types';
+import { UserProfileModal } from '../../../shared/components/UserProfileModal';
 
 type TabType = 'dashboard' | 'scanner' | 'garments' | 'tailors' | 'approvals';
-=======
-import { ApiClient as MockApi } from '../../../infrastructure/api/ApiClient';
-import { Garment, Tailor, LeaveRequest, PayoutClaim, GenderCategory, TailorScore, Hub } from '../../../domain/models/types';
-import { UserProfileModal } from '../../../shared/components/UserProfileModal';
->>>>>>> c0a5703 (good morning)
 
 
 export const HubManagerDashboard = () => {
@@ -137,20 +132,6 @@ export const HubManagerDashboard = () => {
     }
   };
 
-<<<<<<< HEAD
-  const openAudit = async (garment: Garment) => {
-    const ev = await MockApi.getAuditTrail(garment.id);
-    setAuditGarment(garment);
-    setAuditEvents(ev);
-    setAuditModalVisible(true);
-  };
-
-  const openSmartAssign = (garment: Garment) => {
-    const scores = MockApi.suggestTailorWithScores(garment);
-    setAssignGarment(garment);
-    setAssignScores(scores);
-    setAssignModalVisible(true);
-=======
   const openSmartAssign = async (garment: Garment) => {
     try {
       const scores = await MockApi.suggestTailorWithScores(garment);
@@ -160,7 +141,6 @@ export const HubManagerDashboard = () => {
     } catch (e) {
       console.warn(e);
     }
->>>>>>> c0a5703 (good morning)
   };
 
   const confirmAssign = async (tailor: Tailor) => {
@@ -467,7 +447,7 @@ export const HubManagerDashboard = () => {
                       </TouchableOpacity>
                     )}
                     {isManager && (
-                      <TouchableOpacity style={[styles.smartAssignBtn, { backgroundColor: '#f1f5f9', marginTop: 8 }]} onPress={() => openAudit(item)}>
+                      <TouchableOpacity style={[styles.smartAssignBtn, { backgroundColor: '#f1f5f9', marginTop: 8 }]} onPress={() => Alert.alert('Audit Trail', `Audit trail for garment ${item.qrCode}`)}>
                         <Text style={[styles.smartAssignBtnText, { color: '#475569' }]}>📋 View Audit Trail</Text>
                       </TouchableOpacity>
                     )}

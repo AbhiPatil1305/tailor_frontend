@@ -195,6 +195,29 @@ export const ApiClient = {
     return json.data || json;
   },
 
+  async getOrderById(orderId: string): Promise<any> {
+    try {
+      const res = await this.fetchWithAuth(`/orders/${orderId}`);
+      const json = await res.json();
+      return json.data || null;
+    } catch {
+      return null;
+    }
+  },
+
+
+  async requestClarification(garmentId: string, issue: string, message: string, requestedBy: string): Promise<any> {
+    try {
+      const res = await this.fetchWithAuth(`/garments/${garmentId}/clarification`, {
+        method: 'POST',
+        body: JSON.stringify({ issue, message, requestedBy }),
+      });
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
 
   // --- 3. Hub Operations & Garment Workflow ---
   async advanceGarmentStage(

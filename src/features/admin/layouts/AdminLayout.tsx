@@ -101,9 +101,44 @@ export const AdminLayout = ({ children, title, activeRoute = 'Dashboard' }: Prop
       {/* Main Content */}
       <View style={styles.main}>
         <View style={styles.header}>
-          <View style={styles.hubFilter}>
-            <Text style={styles.hubFilterText}>ALL HUBS</Text>
-            <Ionicons name="chevron-down" size={16} color="#475569" />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <TouchableOpacity
+              style={[styles.headerNavBtn, activeRoute === 'Dashboard' && styles.headerNavBtnActive]}
+              onPress={() => navigation.navigate('AdminDashboard')}
+            >
+              <Ionicons
+                name="grid-outline"
+                size={15}
+                color={activeRoute === 'Dashboard' ? '#2563eb' : '#475569'}
+              />
+              <Text
+                style={[
+                  styles.headerNavBtnText,
+                  activeRoute === 'Dashboard' && styles.headerNavBtnTextActive,
+                ]}
+              >
+                Dashboard
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.headerNavBtn, activeRoute === 'Hubs' && styles.headerNavBtnActive]}
+              onPress={() => navigation.navigate('AdminHubs')}
+            >
+              <Ionicons
+                name="business-outline"
+                size={15}
+                color={activeRoute === 'Hubs' ? '#2563eb' : '#475569'}
+              />
+              <Text
+                style={[
+                  styles.headerNavBtnText,
+                  activeRoute === 'Hubs' && styles.headerNavBtnTextActive,
+                ]}
+              >
+                Hubs Management
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.headerRight}>
@@ -229,6 +264,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 24,
+  },
+  headerNavBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  headerNavBtnActive: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#93c5fd',
+  },
+  headerNavBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  headerNavBtnTextActive: {
+    color: '#2563eb',
+    fontWeight: '700',
   },
   hubFilter: {
     flexDirection: 'row',

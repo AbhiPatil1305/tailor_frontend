@@ -3,16 +3,13 @@ import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   Alert, SafeAreaView, Modal, TextInput, Platform
 } from 'react-native';
-<<<<<<< HEAD
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
-=======
 import { Ionicons } from '@expo/vector-icons';
->>>>>>> c0a5703 (good morning)
 import { useAuth } from '../../../core/auth/AuthContext';
 import { ApiClient as MockApi } from '../../../infrastructure/api/ApiClient';
 import { Garment, Tailor, PayoutLedger } from '../../../domain/models/types';
 import { UserProfileModal } from '../../../shared/components/UserProfileModal';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
 export const TailorDashboardScreen = () => {
   const { logout, userName, userId } = useAuth();

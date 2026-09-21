@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, ActivityIndicator, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Modal,
+  ActivityIndicator,
+  Platform,
+  ScrollView,
+  Alert,
+} from 'react-native';
 import { ApiClient } from '../../../infrastructure/api/ApiClient';
 
 interface Props {
@@ -24,11 +35,30 @@ export const AddHubModal: React.FC<Props> = ({ visible, onClose, onSuccess }) =>
     onClose();
   };
 
+  const handleNameChange = (val: string) => {
+    setName(val);
+    setError(null);
+    // If code has not been manually edited yet, auto-suggest code
+    if (!code || code === name.trim().toUpperCase().replace(/\s+/g, '-').slice(0, 15)) {
+      const suggested = val.trim().toUpperCase().replace(/[^A-Z0-9]/g, '-').slice(0, 15);
+      if (suggested) {
+        setCode(`HUB-${suggested}`);
+      }
+    }
+  };
+
+  const handleCodeChange = (val: string) => {
+    // Sanitize: uppercase, replace spaces with hyphen, only allow valid characters
+    const sanitized = val.toUpperCase().replace(/\s+/g, '-').replace(/[^A-Z0-9_-]/g, '');
+    setCode(sanitized);
+    setError(null);
+  };
+
   const handleSubmit = async () => {
     setError(null);
 
     const trimmedName = name.trim();
-    const trimmedCode = code.trim().toUpperCase();
+    const trimmedCode = code.trim().toUpperCase().replace(/\s+/g, '-');
     const trimmedAddress = addressLine1.trim();
     const trimmedCity = city.trim();
     const trimmedState = state.trim();
@@ -36,39 +66,48 @@ export const AddHubModal: React.FC<Props> = ({ visible, onClose, onSuccess }) =>
     const trimmedPhone = contactPhone.trim();
 
     if (!trimmedName) {
-      setError('Please enter a Hub Name.');
+      const msg = 'Please enter a Hub Name.';
+      setError(msg);
       return;
     }
     if (trimmedName.length < 2) {
-      setError('Hub name must be at least 2 characters long.');
+      const msg = 'Hub name must be at least 2 characters long.';
+      setError(msg);
       return;
     }
     if (!trimmedCode) {
-      setError('Please enter a Hub Code.');
+      const msg = 'Please enter a Hub Code.';
+      setError(msg);
       return;
     }
     if (!/^[A-Z0-9_-]{2,20}$/.test(trimmedCode)) {
-      setError('Hub code must be 2 to 20 characters (letters, numbers, hyphens or underscores, e.g. HUB-01, JAIPUR_01).');
+      const msg = 'Hub code must be 2 to 20 characters (letters, numbers, hyphens or underscores, e.g. HUB-01, JAIPUR_01).';
+      setError(msg);
       return;
     }
     if (!trimmedAddress) {
-      setError('Please enter Address Line 1.');
+      const msg = 'Please enter Address Line 1.';
+      setError(msg);
       return;
     }
     if (!trimmedCity) {
-      setError('Please enter City.');
+      const msg = 'Please enter City.';
+      setError(msg);
       return;
     }
     if (!trimmedState) {
-      setError('Please enter State.');
+      const msg = 'Please enter State.';
+      setError(msg);
       return;
     }
     if (!trimmedPincode) {
-      setError('Please enter Pincode.');
+      const msg = 'Please enter Pincode.';
+      setError(msg);
       return;
     }
     if (!trimmedPhone) {
-      setError('Please enter Contact Phone.');
+      const msg = 'Please enter Contact Phone.';
+      setError(msg);
       return;
     }
 
@@ -96,6 +135,14 @@ export const AddHubModal: React.FC<Props> = ({ visible, onClose, onSuccess }) =>
       setContactPhone('');
       setError(null);
 
+      // Show immediate feedback to user
+      const successTitle = `Hub "${trimmedName}" (${trimmedCode}) created successfully!`;
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
+        window.alert(successTitle);
+      } else {
+        Alert.alert('Success', successTitle);
+      }
+
       // Close modal and notify parent
       onClose();
       if (onSuccess) {
@@ -115,6 +162,11 @@ export const AddHubModal: React.FC<Props> = ({ visible, onClose, onSuccess }) =>
         }
       } catch {}
       setError(msg);
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
+        window.alert(`Error: ${msg}`);
+      } else {
+        Alert.alert('Error', msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -131,92 +183,127 @@ export const AddHubModal: React.FC<Props> = ({ visible, onClose, onSuccess }) =>
             </TouchableOpacity>
           </View>
 
-          {error && (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorIcon}>⚠</Text>
-              <Text style={styles.errorText}>{error}</Text>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {error && (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorIcon}>⚠</Text>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            <Text style={styles.inputLabel}>Hub Name *</Text>
+            <TextInput
+              placeholder="e.g. South Delhi Hub"
+              placeholderTextColor="#94a3b8"
+              style={styles.input}
+              value={name}
+              onChangeText={handleNameChange}
+              editable={!loading}
+            />
+
+            <Text style={styles.inputLabel}>Hub Code * (e.g. HUB-01, JAIPUR-MAIN)</Text>
+            <TextInput
+              placeholder="e.g. HUB-DELHI-01"
+              placeholderTextColor="#94a3b8"
+              autoCapitalize="characters"
+              style={styles.input}
+              value={code}
+              onChangeText={handleCodeChange}
+              editable={!loading}
+            />
+
+            <Text style={styles.inputLabel}>Address Line 1 *</Text>
+            <TextInput
+              placeholder="Plot No, Street name"
+              placeholderTextColor="#94a3b8"
+              style={styles.input}
+              value={addressLine1}
+              onChangeText={(t) => { setAddressLine1(t); setError(null); }}
+              editable={!loading}
+            />
+
+            <View style={styles.row}>
+              <View style={styles.halfInput}>
+                <Text style={styles.inputLabel}>City *</Text>
+                <TextInput
+                  placeholder="e.g. Jaipur"
+                  placeholderTextColor="#94a3b8"
+                  style={styles.input}
+                  value={city}
+                  onChangeText={(t) => { setCity(t); setError(null); }}
+                  editable={!loading}
+                />
+              </View>
+              <View style={styles.halfInput}>
+                <Text style={styles.inputLabel}>State *</Text>
+                <TextInput
+                  placeholder="e.g. Rajasthan"
+                  placeholderTextColor="#94a3b8"
+                  style={styles.input}
+                  value={state}
+                  onChangeText={(t) => { setState(t); setError(null); }}
+                  editable={!loading}
+                />
+              </View>
             </View>
-          )}
 
-          <TextInput
-            placeholder="Hub Name (e.g. South Delhi Hub)"
-            style={styles.input}
-            value={name}
-            onChangeText={(t) => { setName(t); setError(null); }}
-            editable={!loading}
-          />
-          <TextInput
-            placeholder="Hub Code (e.g. HUB-01, BLR-MAIN)"
-            autoCapitalize="characters"
-            style={styles.input}
-            value={code}
-            onChangeText={(t) => { setCode(t.toUpperCase()); setError(null); }}
-            editable={!loading}
-          />
-          <TextInput
-            placeholder="Address Line 1"
-            style={styles.input}
-            value={addressLine1}
-            onChangeText={(t) => { setAddressLine1(t); setError(null); }}
-            editable={!loading}
-          />
-          <View style={styles.row}>
-            <TextInput
-              placeholder="City"
-              style={[styles.input, styles.halfInput]}
-              value={city}
-              onChangeText={(t) => { setCity(t); setError(null); }}
-              editable={!loading}
-            />
-            <TextInput
-              placeholder="State"
-              style={[styles.input, styles.halfInput]}
-              value={state}
-              onChangeText={(t) => { setState(t); setError(null); }}
-              editable={!loading}
-            />
-          </View>
-          <View style={styles.row}>
-            <TextInput
-              placeholder="Pincode"
-              style={[styles.input, styles.halfInput]}
-              keyboardType="numeric"
-              value={pincode}
-              onChangeText={(t) => { setPincode(t); setError(null); }}
-              editable={!loading}
-            />
-            <TextInput
-              placeholder="Contact Phone"
-              style={[styles.input, styles.halfInput]}
-              keyboardType="phone-pad"
-              value={contactPhone}
-              onChangeText={(t) => { setContactPhone(t); setError(null); }}
-              editable={!loading}
-            />
-          </View>
+            <View style={styles.row}>
+              <View style={styles.halfInput}>
+                <Text style={styles.inputLabel}>Pincode *</Text>
+                <TextInput
+                  placeholder="e.g. 302001"
+                  placeholderTextColor="#94a3b8"
+                  style={styles.input}
+                  keyboardType="numeric"
+                  value={pincode}
+                  onChangeText={(t) => { setPincode(t); setError(null); }}
+                  editable={!loading}
+                />
+              </View>
+              <View style={styles.halfInput}>
+                <Text style={styles.inputLabel}>Contact Phone *</Text>
+                <TextInput
+                  placeholder="e.g. +919876543210"
+                  placeholderTextColor="#94a3b8"
+                  style={styles.input}
+                  keyboardType="phone-pad"
+                  value={contactPhone}
+                  onChangeText={(t) => { setContactPhone(t); setError(null); }}
+                  editable={!loading}
+                />
+              </View>
+            </View>
 
-          <View style={styles.actions}>
-            <TouchableOpacity
-              onPress={handleClose}
-              style={[styles.button, styles.cancelBtn]}
-              disabled={loading}
-            >
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
+            {error && (
+              <View style={[styles.errorBox, { marginTop: 8 }]}>
+                <Text style={styles.errorIcon}>⚠</Text>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
 
-            <TouchableOpacity
-              onPress={handleSubmit}
-              style={[styles.button, styles.submitBtn, loading && styles.submitBtnDisabled]}
-              disabled={loading}
-              activeOpacity={0.8}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Create Hub</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+            <View style={styles.actions}>
+              <TouchableOpacity
+                onPress={handleClose}
+                style={[styles.button, styles.cancelBtn]}
+                disabled={loading}
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleSubmit}
+                style={[styles.button, styles.submitBtn, loading && styles.submitBtnDisabled]}
+                disabled={loading}
+                activeOpacity={0.8}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Create Hub</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -234,10 +321,18 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     maxWidth: 520,
+    maxHeight: '90%',
     backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 24,
     elevation: 8,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+    marginBottom: 5,
+    marginTop: 4,
   },
   modalHeader: {
     flexDirection: 'row',

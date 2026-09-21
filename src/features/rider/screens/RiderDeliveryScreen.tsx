@@ -23,11 +23,8 @@ export const RiderDeliveryScreen = () => {
     }
   };
   const [garments, setGarments] = useState<Garment[]>([]);
-<<<<<<< HEAD
   const [orders, setOrders] = useState<any[]>([]);
-=======
   const [showProfile, setShowProfile] = useState(false);
->>>>>>> c0a5703 (good morning)
 
   // OTP modal
   const [otpModalVisible, setOtpModalVisible] = useState(false);

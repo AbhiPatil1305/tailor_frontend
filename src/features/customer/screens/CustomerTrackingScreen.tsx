@@ -1,11 +1,6 @@
 import React, { useEffect, useState } from 'react';
-<<<<<<< HEAD
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, SafeAreaView, ScrollView, TextInput } from 'react-native';
-import { MockApi } from '../../../infrastructure/api/MockApi';
-=======
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, SafeAreaView, ScrollView } from 'react-native';
 import { ApiClient } from '../../../infrastructure/api/ApiClient';
->>>>>>> c0a5703 (good morning)
 import { Order, Garment } from '../../../domain/models/types';
 import { SLAIndicator } from '../../../shared/components/SLAIndicator';
 import { EmptyState } from '../../../shared/components/EmptyState';
@@ -29,13 +24,14 @@ export const CustomerTrackingScreen = ({ selectedRef }: Props) => {
   const submitClarification = async (garment: Garment) => {
     const data = clarificationData[garment.id];
     if (!data || Object.keys(data).length === 0) return;
-    await MockApi.submitClarification(garment.id, data, 'c1');
+    // TODO: integrate with real API clarification endpoint
+    console.log('Submitting clarification for garment', garment.id, data);
     
     // refresh
-    const updatedOrders = await MockApi.getOrders();
-    const myOrders = updatedOrders.filter((o: Order) => o.customerId === 'c1').reverse();
+    const updatedOrders = await ApiClient.getMyOrders();
+    const myOrders = updatedOrders.reverse();
     setOrders(myOrders);
-    setSelectedOrder(myOrders.find(o => o.id === selectedOrder?.id) || null);
+    setSelectedOrderTracking(null);
     setClarificationData(prev => {
       const next = {...prev};
       delete next[garment.id];
@@ -148,12 +144,7 @@ export const CustomerTrackingScreen = ({ selectedRef }: Props) => {
               <Text style={s.garmentType}>{g.type} ({g.gender})</Text>
               <Text style={s.garmentQr}>{g.qrCode}</Text>
             </View>
-<<<<<<< HEAD
-            <SLAIndicator slaDeadline={g.slaDeadline} compact />
-
-=======
             <SLAIndicator slaDeadline={g.sla} compact />
->>>>>>> c0a5703 (good morning)
             <View style={[s.stagePill, { marginTop: 8 }]}>
               <Text style={s.stagePillText}>{STAGE_LABELS[g.currentStage] || g.currentStage || 'Booked'}</Text>
             </View>

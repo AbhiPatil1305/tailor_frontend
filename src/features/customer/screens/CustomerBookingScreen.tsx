@@ -5,16 +5,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../core/auth/AuthContext';
-<<<<<<< HEAD
-import { MockApi } from '../../../infrastructure/api/MockApi';
-import { Order, GarmentMeasurements } from '../../../domain/models/types';
-=======
 import { ApiClient } from '../../../infrastructure/api/ApiClient';
 import { Order } from '../../../domain/models/types';
 import { UserProfileModal } from '../../../shared/components/UserProfileModal';
 import { LocationPickerModal } from '../../../shared/components/LocationPickerModal';
 import { LocationService, Coordinates } from '../../../infrastructure/services/LocationService';
->>>>>>> c0a5703 (good morning)
 
 const GARMENT_TYPES = ['Shirt', 'Trousers', 'Kurta', 'Suit', 'Saree', 'Dress', 'Other'];
 const GENDER_OPTIONS = ['ladies', 'gents', 'kids', 'unisex'] as const;
@@ -39,26 +34,22 @@ const MEASUREMENT_FIELDS: Record<string, string[]> = {
   Other: ['Custom 1', 'Custom 2']
 };
 
+const TRACKING_STAGES = [
+  { key: 'intake', label: 'Received at Hub' },
+  { key: 'cutting', label: 'Cutting' },
+  { key: 'stitching', label: 'Stitching' },
+  { key: 'qc', label: 'Quality Check' },
+  { key: 'ironing', label: 'Ironing' },
+  { key: 'packed', label: 'Packed' },
+  { key: 'dispatched', label: 'Dispatched' },
+  { key: 'out_for_delivery', label: 'Out for Delivery' },
+  { key: 'delivered', label: 'Delivered' },
+];
+
+const stageIndex = (s: string) => TRACKING_STAGES.findIndex(item => item.key === s);
+
 export const CustomerBookingScreen = () => {
   const { logout, userName } = useAuth();
-<<<<<<< HEAD
-  const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
-
-  // Booking form state
-  const [customerName, setCustomerName] = useState('Ravi Kumar');
-  const [customerPhone, setCustomerPhone] = useState('9000000001');
-  const [customerAddress, setCustomerAddress] = useState('12, Gandhi Nagar, Bidar');
-  
-  const [garments, setGarments] = useState<BookingGarment[]>([
-    { id: Math.random().toString(), type: 'Shirt', gender: 'gents', measurementOption: 'none', measurementsData: {} }
-  ]);
-  
-  const [savedMeasurements, setSavedMeasurements] = useState<Record<string, Record<string, any>>>({});
-  
-  const [pickupDate, setPickupDate] = useState('Tomorrow');
-  const [pickupTime, setPickupTime] = useState('10:00 AM – 12:00 PM');
-  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'online'>('cod');
-=======
   const [showProfile, setShowProfile] = useState(false);
 
   const confirmLogout = () => {
@@ -87,21 +78,18 @@ export const CustomerBookingScreen = () => {
 
   const [showMapModal, setShowMapModal] = useState(false);
   const [fetchingLocation, setFetchingLocation] = useState(false);
-  const [garments, setGarments] = useState([{ type: 'Shirt', gender: 'gents' as const }]);
+  const [garments, setGarments] = useState<BookingGarment[]>([
+    { id: '1', type: 'Shirt', gender: 'gents', measurementOption: 'none', measurementsData: {} }
+  ]);
+  const [pickupDate, setPickupDate] = useState('Tomorrow');
+  const [pickupTime, setPickupTime] = useState('10:00 AM – 12:00 PM');
+  const [savedMeasurements, setSavedMeasurements] = useState<Record<string, Record<string, string>>>({
+    Shirt: { Chest: '40', Shoulder: '18', Sleeve: '24', Length: '29', Waist: '34' }
+  });
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'ONLINE'>('COD');
->>>>>>> c0a5703 (good morning)
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-<<<<<<< HEAD
-  useEffect(() => {
-    loadSavedMeasurements();
-  }, []);
-
-  const loadSavedMeasurements = async () => {
-    const saved = await MockApi.getCustomerSavedMeasurements('c1');
-    setSavedMeasurements(saved || {});
-=======
   useEffect(() => { loadOrders(); loadAddresses(); }, []);
   useEffect(() => { if (tab === 'track') loadOrders(); }, [tab]);
 
@@ -125,7 +113,6 @@ export const CustomerBookingScreen = () => {
     } catch (e) {
       console.warn('Failed to load addresses', e);
     }
->>>>>>> c0a5703 (good morning)
   };
 
   const getPayout = (t: string) => t === 'Shirt' ? 150 : t === 'Trousers' ? 180 : t === 'Kurta' ? 200 : t === 'Suit' ? 500 : t === 'Saree' ? 300 : t === 'Dress' ? 250 : 160;
@@ -159,6 +146,34 @@ export const CustomerBookingScreen = () => {
     setGarments(prev => prev.map(g => g.id === id ? { ...g, measurementsData: { ...g.measurementsData, [key]: val } } : g));
   };
 
+  const renderStepper = (type: string) => {
+    const count = garments.filter(g => g.type === type).length;
+    const payout = getPayout(type);
+    const price = Math.round(payout * 1.6);
+    return (
+      <View key={type} style={styles.counterRow}>
+        <View>
+          <Text style={styles.counterLabel}>{type}</Text>
+          <Text style={styles.counterPrice}>₹{price} / item</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {count > 0 && (
+            <Text style={styles.counterSubtotal}>₹{count * price}</Text>
+          )}
+          <View style={styles.stepper}>
+            <TouchableOpacity style={styles.stepperBtn} onPress={() => handleDecrement(type)}>
+              <Text style={styles.stepperBtnText}>-</Text>
+            </TouchableOpacity>
+            <Text style={styles.stepperValue}>{count}</Text>
+            <TouchableOpacity style={styles.stepperBtn} onPress={() => handleIncrement(type)}>
+              <Text style={styles.stepperBtnText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   const handleBook = async () => {
     const newErrors: { [key: string]: string } = {};
 
@@ -181,52 +196,6 @@ export const CustomerBookingScreen = () => {
     setErrors({});
     setLoading(true);
     try {
-<<<<<<< HEAD
-      // Map frontend state to API format
-      const finalGarments = garments.map(g => {
-        let measurementPayload: GarmentMeasurements | undefined = undefined;
-
-        if (g.measurementOption === 'saved') {
-          const savedData = savedMeasurements[g.type];
-          measurementPayload = {
-            version: 1,
-            status: 'CONFIRMED',
-            source: 'SAVED',
-            data: savedData || {},
-            confirmedAt: new Date().toISOString(),
-            confirmedBy: 'c1'
-          };
-        } else if (g.measurementOption === 'new') {
-          measurementPayload = {
-            version: 1,
-            status: 'CONFIRMED',
-            source: 'NEW',
-            data: g.measurementsData,
-            confirmedAt: new Date().toISOString(),
-            confirmedBy: 'c1'
-          };
-        } else {
-          measurementPayload = {
-            version: 1,
-            status: 'NOT_PROVIDED',
-            source: 'NEW',
-            data: {}
-          };
-        }
-
-        return {
-          type: g.type,
-          gender: g.gender,
-          measurements: measurementPayload
-        };
-      });
-
-      const order = await MockApi.bookOrder({
-        customerName, customerPhone, customerAddress,
-        pickupDate, pickupTime,
-        paymentMethod,
-        garments: finalGarments as any,
-=======
       let finalAddressId = selectedAddressId;
 
       // If it's a newly picked address (no ID), save it to DB first
@@ -264,7 +233,6 @@ export const CustomerBookingScreen = () => {
           serviceCharge: 120.00,
           measurements: { unit: 'cm' }
         })),
->>>>>>> c0a5703 (good morning)
       });
       setConfirmedOrder(order);
     } catch (e: any) {
@@ -274,37 +242,10 @@ export const CustomerBookingScreen = () => {
     }
   };
 
-<<<<<<< HEAD
-  const renderStepper = (type: string) => {
-    const count = garments.filter(g => g.type === type).length;
-    const price = Math.round(getPayout(type) * 1.6);
-    return (
-      <View key={type} style={styles.counterRow}>
-        <View>
-          <Text style={styles.counterLabel}>{type}</Text>
-          <Text style={styles.counterPrice}>₹{price} / pc</Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          {count > 0 && <Text style={styles.counterSubtotal}>₹{count * price}</Text>}
-          <View style={styles.stepper}>
-            <TouchableOpacity style={styles.stepperBtn} onPress={() => handleDecrement(type)}>
-              <Text style={styles.stepperBtnText}>-</Text>
-            </TouchableOpacity>
-            <Text style={styles.stepperValue}>{count}</Text>
-            <TouchableOpacity style={styles.stepperBtn} onPress={() => handleIncrement(type)}>
-              <Text style={styles.stepperBtnText}>+</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    );
-=======
-  const stageIndex = (stage: string) => STAGE_ORDER.indexOf(stage);
   const getSlaColor = (slaDeadline?: string) => {
     if (!slaDeadline) return '#94a3b8';
     const sla = ApiClient.getSlaStatus(slaDeadline);
     return sla.color;
->>>>>>> c0a5703 (good morning)
   };
 
   return (
@@ -314,14 +255,6 @@ export const CustomerBookingScreen = () => {
           <Text style={styles.greeting}>Welcome back,</Text>
           <Text style={styles.userName}>{userName}</Text>
         </View>
-<<<<<<< HEAD
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <View style={styles.profileIcon}><Text style={styles.profileIconText}>👤</Text></View>
-          <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-            <Text style={styles.logoutText}>Logout</Text>
-          </TouchableOpacity>
-        </View>
-=======
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <TouchableOpacity style={[styles.logoutBtn, { marginRight: 8 }]} onPress={() => setShowProfile(true)}>
             <Ionicons name="person-outline" size={24} color="#475569" />
@@ -353,7 +286,6 @@ export const CustomerBookingScreen = () => {
             Track Orders {orders.length > 0 ? `(${orders.length})` : ''}
           </Text>
         </TouchableOpacity>
->>>>>>> c0a5703 (good morning)
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -371,10 +303,6 @@ export const CustomerBookingScreen = () => {
               {errors.customerPhone && <Text style={styles.errorText}>{errors.customerPhone}</Text>}
               
               <Text style={styles.inputLabel}>Delivery Address</Text>
-<<<<<<< HEAD
-              <TextInput style={[styles.input, { height: 60 }, errors.customerAddress ? styles.inputError : null]} value={customerAddress} onChangeText={setCustomerAddress} multiline placeholder="Full address" />
-              {errors.customerAddress && <Text style={styles.errorText}>{errors.customerAddress}</Text>}
-=======
               <TextInput 
                 style={[styles.input, { height: 60 }]} 
                 value={customerAddress} 
@@ -423,7 +351,6 @@ export const CustomerBookingScreen = () => {
                   </ScrollView>
                 </>
               )}
->>>>>>> c0a5703 (good morning)
             </View>
 
             <View style={styles.card}>
@@ -610,8 +537,6 @@ export const CustomerBookingScreen = () => {
             </TouchableOpacity>
           </View>
         )}
-<<<<<<< HEAD
-=======
 
         {/* ── TRACKING TAB ─────────────────────────── */}
         {tab === 'track' && (
@@ -680,29 +605,23 @@ export const CustomerBookingScreen = () => {
             )}
           </>
         )}
->>>>>>> c0a5703 (good morning)
       </ScrollView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-<<<<<<< HEAD
-  safeArea: { flex: 1, backgroundColor: '#f8fafc' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  greeting: { fontSize: 13, color: '#64748b' },
-  userName: { fontSize: 18, fontWeight: '800', color: '#1e293b' },
-  profileIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
-  profileIconText: { fontSize: 16 },
-  logoutBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#f1f5f9', borderRadius: 6 },
-  logoutText: { color: '#ef4444', fontWeight: '600', fontSize: 13 },
-=======
   safeArea: { flex: 1, backgroundColor: '#f1f5f9' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#fff' },
   greeting: { fontSize: 13, color: '#64748b', fontWeight: '500' },
   userName: { fontSize: 20, fontWeight: '800', color: '#1e293b' },
   logoutBtn: { padding: 4 },
->>>>>>> c0a5703 (good morning)
+
+  tabBar: { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  tab: { flex: 1, paddingVertical: 14, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  activeTab: { borderBottomColor: '#3b82f6' },
+  tabText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
+  activeTabText: { color: '#3b82f6', fontWeight: '700' },
 
   scrollContent: { padding: 16, paddingBottom: 60 },
   card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
@@ -781,8 +700,6 @@ const styles = StyleSheet.create({
   successRowValue: { fontSize: 14, color: '#1e293b', fontWeight: '600' },
   secondaryBtn: { backgroundColor: '#f8fafc', paddingVertical: 14, paddingHorizontal: 24, borderRadius: 12, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
   secondaryBtnText: { color: '#475569', fontSize: 15, fontWeight: '700' },
-<<<<<<< HEAD
-=======
 
   emptyState: { alignItems: 'center', paddingVertical: 60 },
   emptyIcon: { fontSize: 48, marginBottom: 16 },
@@ -821,5 +738,4 @@ const styles = StyleSheet.create({
   savedAddressChipActive: { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' },
   savedAddressText: { fontSize: 13, color: '#64748b', fontWeight: '500' },
   savedAddressTextActive: { color: '#1e40af', fontWeight: '700' }
->>>>>>> c0a5703 (good morning)
 });
