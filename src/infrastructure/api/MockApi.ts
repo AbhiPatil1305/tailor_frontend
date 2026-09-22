@@ -184,9 +184,12 @@ export const MockApi = {
         // COD collected on delivery
         if (newStage === 'delivered') {
           const ord = store.orders.find(o => o.id === garment.orderId);
-          if (ord && ord.paymentMethod === 'cod') {
-            ord.paymentStatus = 'cod_collected';
-            appendEvent(garment.id, 'COD_COLLECTED', 'delivered', 'delivered', performedBy, performedByRole, garment.hubId);
+          if (ord) {
+            const allDelivered = ord.garments.every((g) => g.stage === 'delivered' || g.id === garment.id);
+            if (allDelivered && ord.paymentMethod === 'cod' && ord.paymentStatus !== 'paid') {
+              ord.paymentStatus = 'paid';
+              appendEvent(garment.id, 'COD_COLLECTED', 'delivered', 'delivered', performedBy, performedByRole, garment.hubId, { amount: ord.totalAmount, paymentStatus: 'paid' });
+            }
           }
         }
         return garment;
@@ -210,7 +213,7 @@ export const MockApi = {
   suggestTailorWithScores: (garment: Garment, hubId?: string): TailorScore[] => {
     const targetHub = hubId || garment.hubId;
     return store.tailors
-      .filter(t => t.status === 'available' && t.hubId === targetHub)
+      .filter(t => t.status === 'available' && t.hubId === targetHub && (t.capacityPerDay - t.assignedToday) > 0)
       .map(t => {
         const genderMatch    = (t.gender === garment.gender || t.gender === 'any') ? 40 : 0;
         const skillMatch     = t.specialisations.some((s: string) =>
@@ -239,14 +242,23 @@ export const MockApi = {
   getTailorById: async (id: string): Promise<Tailor | null> =>
     store.tailors.find(t => t.id === id) || null,
 
-  assignTailor: async (garmentId: string, tailorId: string): Promise<boolean> => {
+  assignTailor: async (garmentId: string, tailorId: string, assignedByUserId: string = 'system'): Promise<boolean> => {
     for (const order of store.orders) {
       const garment = order.garments.find((g: Garment) => g.id === garmentId);
       if (garment) {
+        const previousTailorId = garment.assignedTailorId;
         garment.assignedTailorId = tailorId;
+        
+        // Decrement old tailor if reassigned
+        if (previousTailorId && previousTailorId !== tailorId) {
+            const oldTailor = store.tailors.find(t => t.id === previousTailorId);
+            if (oldTailor && oldTailor.assignedToday > 0) oldTailor.assignedToday -= 1;
+        }
+
         const tailor = store.tailors.find(t => t.id === tailorId);
-        if (tailor) tailor.assignedToday += 1;
-        appendEvent(garment.id, 'TAILOR_ASSIGNED', garment.stage, garment.stage, tailorId, 'hub_manager', garment.hubId, { tailorId });
+        if (tailor && previousTailorId !== tailorId) tailor.assignedToday += 1;
+        
+        appendEvent(garment.id, 'TAILOR_ASSIGNED', garment.stage, garment.stage, assignedByUserId, 'hub_manager', garment.hubId, { previousTailorId, newTailorId: tailorId });
         return true;
       }
     }

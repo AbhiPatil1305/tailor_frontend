@@ -200,7 +200,7 @@ const s = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '900', color: '#1e293b' },
   list: { padding: 16, paddingBottom: 40 },
   selectHint: { fontSize: 14, color: '#64748b', marginBottom: 12, fontWeight: '500' },
-  orderPill: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+  orderPill: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 10, elevation: 1 },
   pillRef: { fontSize: 15, fontWeight: '800', color: '#1e293b', marginBottom: 2 },
   pillMeta: { fontSize: 13, color: '#64748b' },
   pillChev: { fontSize: 22, color: '#94a3b8' },

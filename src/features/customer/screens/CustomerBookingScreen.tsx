@@ -684,7 +684,7 @@ const styles = StyleSheet.create({
   activeTabText: { color: '#3b82f6', fontWeight: '700' },
 
   scrollContent: { padding: 16, paddingBottom: 60 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
+  card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, elevation: 2 },
   cardTitle: { fontSize: 16, fontWeight: '700', color: '#1e293b', marginBottom: 12 },
   inputLabel: { fontSize: 13, color: '#64748b', fontWeight: '600', marginBottom: 6, marginTop: 12 },
   input: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 10, paddingHorizontal: 14, height: 44, color: '#1e293b' },
@@ -696,7 +696,7 @@ const styles = StyleSheet.create({
   counterPrice: { fontSize: 12, color: '#64748b', marginTop: 2 },
   counterSubtotal: { fontSize: 14, fontWeight: '700', color: '#1e293b', marginRight: 16 },
   stepper: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f1f5f9', borderRadius: 8, padding: 4 },
-  stepperBtn: { width: 28, height: 28, backgroundColor: '#fff', borderRadius: 6, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 1, elevation: 1 },
+  stepperBtn: { width: 28, height: 28, backgroundColor: '#fff', borderRadius: 6, alignItems: 'center', justifyContent: 'center', elevation: 1 },
   stepperBtnText: { fontSize: 16, fontWeight: '600', color: '#1e293b' },
   stepperValue: { width: 24, textAlign: 'center', fontSize: 15, fontWeight: '700', color: '#1e293b' },
 
