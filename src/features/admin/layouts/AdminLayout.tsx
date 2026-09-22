@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { useAuth } from '../../../core/auth/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -24,7 +24,12 @@ export const AdminLayout = ({ children, title, activeRoute = 'Dashboard' }: Prop
           <Text style={styles.brandSubtitle}>ADMIN PORTAL</Text>
         </View>
 
-        <ScrollView style={styles.nav}>
+        <ScrollView
+          style={styles.nav}
+          contentContainerStyle={styles.navContent}
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
+        >
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Overview</Text>
             <TouchableOpacity
@@ -58,14 +63,6 @@ export const AdminLayout = ({ children, title, activeRoute = 'Dashboard' }: Prop
               <Text style={[styles.navText, activeRoute === 'Hubs' && styles.activeNavText]}>
                 Hubs
               </Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem}>
-              <Ionicons name="cart-outline" size={16} color="#94a3b8" style={styles.navIcon} />
-              <Text style={styles.navText}>Orders</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem}>
-              <Ionicons name="shirt-outline" size={16} color="#94a3b8" style={styles.navIcon} />
-              <Text style={styles.navText}>Garments</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.navItem}>
               <Ionicons name="cut-outline" size={16} color="#94a3b8" style={styles.navIcon} />
@@ -160,7 +157,12 @@ export const AdminLayout = ({ children, title, activeRoute = 'Dashboard' }: Prop
           <Text style={styles.pageTitle}>{title}</Text>
         </View>
         
-        <ScrollView style={styles.content}>
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={true}
+          keyboardShouldPersistTaps="handled"
+        >
           {children}
         </ScrollView>
       </View>
@@ -173,12 +175,17 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     backgroundColor: '#f1f5f9',
+    height: Platform.OS === 'web' ? ('100vh' as any) : '100%',
+    maxHeight: Platform.OS === 'web' ? ('100vh' as any) : '100%',
+    overflow: 'hidden',
   },
   sidebar: {
     width: 250,
     backgroundColor: '#0f172a',
     display: 'flex',
     flexDirection: 'column',
+    height: '100%',
+    overflow: 'hidden',
   },
   brand: {
     padding: 24,
@@ -201,6 +208,13 @@ const styles = StyleSheet.create({
   nav: {
     flex: 1,
     padding: 16,
+    ...(Platform.OS === 'web' ? {
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none',
+    } : {}),
+  },
+  navContent: {
+    paddingBottom: 20,
   },
   section: {
     marginBottom: 24,
@@ -254,6 +268,9 @@ const styles = StyleSheet.create({
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
+    height: '100%',
+    minHeight: 0,
+    overflow: 'hidden',
   },
   header: {
     height: 64,
@@ -353,6 +370,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  contentContainer: {
     paddingHorizontal: 32,
-  }
+    paddingBottom: 80,
+    flexGrow: 1,
+  },
 });

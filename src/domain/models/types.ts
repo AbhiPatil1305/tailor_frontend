@@ -101,6 +101,7 @@ export interface Garment {
   // SLA
   intakeTime?: string;        // ISO — set on INTAKE event
   slaDeadline?: string;       // intakeTime + 24h
+  codCollected?: boolean;     // true once COD collected on delivery
   createdAt: string;
 }
 

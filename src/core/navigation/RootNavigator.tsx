@@ -12,6 +12,9 @@ import { RiderNavigator } from '../../features/rider/navigation/RiderNavigator';
 import { AdminNavigator } from '../../features/admin/navigation/AdminNavigator';
 import { SuperAdminNavigator } from '../../features/admin/navigation/SuperAdminNavigator';
 import { AdminLoginScreen } from '../../features/admin/screens/AdminLoginScreen';
+import { ManagerLoginScreen } from '../../features/hub/screens/manager/ManagerLoginScreen';
+import { TailorLoginScreen } from '../../features/tailor/screens/TailorLoginScreen';
+import { ActivateAccountScreen } from '../../features/auth/screens/ActivateAccountScreen';
 
 const Stack = createStackNavigator();
 
@@ -41,6 +44,9 @@ export const RootNavigator = () => {
           <>
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="AdminLogin" component={AdminLoginScreen} />
+            <Stack.Screen name="ManagerLogin" component={ManagerLoginScreen} />
+            <Stack.Screen name="TailorLogin" component={TailorLoginScreen} />
+            <Stack.Screen name="ActivateAccount" component={ActivateAccountScreen} />
           </>
         ) : (
           <>

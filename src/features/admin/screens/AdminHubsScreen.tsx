@@ -706,6 +706,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 20,
+    paddingBottom: 40,
   },
   hubCard: {
     backgroundColor: '#ffffff',

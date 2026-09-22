@@ -11,12 +11,18 @@ export const AdminDashboardScreen = () => {
   const [showAddHub, setShowAddHub] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [hubCount, setHubCount] = useState<number | null>(null);
+  const [activeCount, setActiveCount] = useState<number | null>(null);
+  const [managerCount, setManagerCount] = useState<number | null>(null);
+  const [citiesCount, setCitiesCount] = useState<number | null>(null);
 
   const loadHubs = async () => {
     try {
-      const hubs = await ApiClient.getHubs();
+      const hubs = await ApiClient.getHubs(false);
       if (Array.isArray(hubs)) {
         setHubCount(hubs.length);
+        setActiveCount(hubs.filter((h: any) => h.isActive !== false).length);
+        setManagerCount(hubs.filter((h: any) => h.manager || h.managerUserId).length);
+        setCitiesCount(new Set(hubs.map((h: any) => h.city?.trim().toLowerCase()).filter(Boolean)).size);
       }
     } catch (e) {
       console.error('Failed to load hubs:', e);
@@ -81,17 +87,34 @@ export const AdminDashboardScreen = () => {
           <Text style={styles.label}>Total Hubs</Text>
           <Text style={styles.cardHint}>Click to manage all hubs</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.card, styles.clickableCard]}
+          onPress={() => navigation.navigate('AdminHubs')}
+          activeOpacity={0.85}
+        >
+          <View style={styles.cardHeaderRow}>
+            <Text style={[styles.value, { color: '#059669' }]}>{activeCount !== null ? activeCount : '...'}</Text>
+            <Text style={styles.cardArrow}>→</Text>
+          </View>
+          <Text style={styles.label}>Operational Hubs</Text>
+          <Text style={styles.cardHint}>Active facilities</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.card, styles.clickableCard]}
+          onPress={() => navigation.navigate('AdminHubs')}
+          activeOpacity={0.85}
+        >
+          <View style={styles.cardHeaderRow}>
+            <Text style={[styles.value, { color: '#2563eb' }]}>{managerCount !== null ? managerCount : '...'}</Text>
+            <Text style={styles.cardArrow}>→</Text>
+          </View>
+          <Text style={styles.label}>Hub Managers</Text>
+          <Text style={styles.cardHint}>Assigned credentials</Text>
+        </TouchableOpacity>
         <View style={styles.card}>
-          <Text style={styles.value}>284</Text>
-          <Text style={styles.label}>Orders Today</Text>
-        </View>
-        <View style={styles.card}>
-          <Text style={styles.value}>1,142</Text>
-          <Text style={styles.label}>Garments in Production</Text>
-        </View>
-        <View style={styles.card}>
-          <Text style={styles.value}>18</Text>
-          <Text style={styles.label}>At Risk</Text>
+          <Text style={styles.value}>{citiesCount !== null ? citiesCount : '...'}</Text>
+          <Text style={styles.label}>Cities Covered</Text>
+          <Text style={styles.cardHint}>Regional coverage</Text>
         </View>
       </View>
 

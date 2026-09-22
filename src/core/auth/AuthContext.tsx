@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             role: user.role?.toLowerCase() as Role,
             userId: user.id || user.user_id,
             userName: user.name || user.phone,
-            hubId: user.hubId || 'h1'
+            hubId: user.hubId || null
           });
         } catch (e) {
           // Token invalid or expired
@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       role: user.role?.toLowerCase() as Role || 'customer', 
       userId: user.id || user.user_id, 
       userName: user.name || user.phone || user.email, 
-      hubId: user.hubId || 'h1' 
+      hubId: user.hubId || null 
     });
   };
 

@@ -90,7 +90,12 @@ export const CustomerBookingScreen = () => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  useEffect(() => { loadOrders(); loadAddresses(); }, []);
+  // Hub selection
+  const [hubs, setHubs] = useState<any[]>([]);
+  const [selectedHubId, setSelectedHubId] = useState<string>('');
+  const [hubsLoading, setHubsLoading] = useState(false);
+
+  useEffect(() => { loadOrders(); loadAddresses(); loadHubs(); }, []);
   useEffect(() => { if (tab === 'track') loadOrders(); }, [tab]);
 
   const loadOrders = async () => {
@@ -112,6 +117,21 @@ export const CustomerBookingScreen = () => {
       }
     } catch (e) {
       console.warn('Failed to load addresses', e);
+    }
+  };
+
+  const loadHubs = async () => {
+    setHubsLoading(true);
+    try {
+      const data = await ApiClient.listHubs(true);
+      setHubs(data);
+      if (data.length > 0) {
+        setSelectedHubId(data[0].id || data[0]._id);
+      }
+    } catch (e) {
+      console.warn('Failed to load hubs', e);
+    } finally {
+      setHubsLoading(false);
     }
   };
 
@@ -184,6 +204,7 @@ export const CustomerBookingScreen = () => {
       newErrors.customerPhone = 'Enter a valid 10-digit mobile number';
     }
     if (!customerAddress.trim()) newErrors.customerAddress = 'Address is required';
+    if (!selectedHubId) newErrors.hub = 'Please select a hub';
     if (garments.length === 0) newErrors.garments = 'At least one garment is required';
     if (!pickupDate) newErrors.pickupDate = 'Pickup date is required';
     if (!pickupTime) newErrors.pickupTime = 'Pickup time window is required';
@@ -220,7 +241,7 @@ export const CustomerBookingScreen = () => {
 
       const order = await ApiClient.bookOrder({
         addressId: finalAddressId,
-        hubId: 'h1',
+        hubId: selectedHubId,
         pickupSlot: {
           date: new Date().toISOString().split('T')[0],
           startTime: '10:00',
@@ -351,6 +372,45 @@ export const CustomerBookingScreen = () => {
                   </ScrollView>
                 </>
               )}
+            </View>
+
+            {/* Hub Selection Card */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Select Hub</Text>
+              <Text style={styles.inputLabel}>Choose which TAILOR24 hub will handle your order</Text>
+              {hubsLoading ? (
+                <ActivityIndicator size="small" color="#f59e0b" style={{ marginTop: 12 }} />
+              ) : hubs.length === 0 ? (
+                <Text style={styles.errorText}>No hubs available at the moment.</Text>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
+                  {hubs.map((hub) => {
+                    const id = hub.id || hub._id;
+                    const isSelected = selectedHubId === id;
+                    return (
+                      <TouchableOpacity
+                        key={id}
+                        style={[styles.hubChip, isSelected && styles.hubChipActive]}
+                        onPress={() => setSelectedHubId(id)}
+                      >
+                        <Text style={[styles.hubChipIcon]}>🏭</Text>
+                        <Text style={[styles.hubChipName, isSelected && styles.hubChipNameActive]}>
+                          {hub.name}
+                        </Text>
+                        {hub.address?.city ? (
+                          <Text style={[styles.hubChipCity, isSelected && styles.hubChipCityActive]}>
+                            {hub.address.city}
+                          </Text>
+                        ) : null}
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={16} color="#fff" style={{ marginTop: 4 }} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
+              {errors.hub && <Text style={styles.errorText}>{errors.hub}</Text>}
             </View>
 
             <View style={styles.card}>
@@ -528,7 +588,7 @@ export const CustomerBookingScreen = () => {
               <View style={styles.successRow}><Text style={styles.successRowLabel}>Garments</Text><Text style={styles.successRowValue}>{confirmedOrder.garments.length} Items</Text></View>
               <View style={styles.successRow}><Text style={styles.successRowLabel}>Pickup Date</Text><Text style={styles.successRowValue}>{confirmedOrder.pickupDate}</Text></View>
               <View style={styles.successRow}><Text style={styles.successRowLabel}>Time Window</Text><Text style={styles.successRowValue}>{confirmedOrder.pickupTime}</Text></View>
-              <View style={styles.successRow}><Text style={styles.successRowLabel}>Payment</Text><Text style={styles.successRowValue}>{confirmedOrder.paymentMethod.toUpperCase()}</Text></View>
+              <View style={styles.successRow}><Text style={styles.successRowLabel}>Payment</Text><Text style={styles.successRowValue}>{(confirmedOrder.paymentMethod || 'COD').toUpperCase()}</Text></View>
               <View style={[styles.successRow, { borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 8, marginTop: 4 }]}><Text style={[styles.successRowLabel, { fontWeight: '700' }]}>Total</Text><Text style={[styles.successRowValue, { fontWeight: '900', color: '#10b981' }]}>₹{confirmedOrder.totalAmount}</Text></View>
             </View>
 
@@ -563,7 +623,7 @@ export const CustomerBookingScreen = () => {
                   </View>
 
                   {/* Per-garment tracking timeline */}
-                  {order.garments.map((garment, gi) => {
+                  {(order.garments || []).map((garment, gi) => {
                     const currentIdx = stageIndex(garment.stage);
                     const sla = garment.slaDeadline ? ApiClient.getSlaStatus(garment.slaDeadline) : null;
                     return (
@@ -737,5 +797,12 @@ const styles = StyleSheet.create({
   savedAddressChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#e2e8f0', gap: 6 },
   savedAddressChipActive: { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' },
   savedAddressText: { fontSize: 13, color: '#64748b', fontWeight: '500' },
-  savedAddressTextActive: { color: '#1e40af', fontWeight: '700' }
+  savedAddressTextActive: { color: '#1e40af', fontWeight: '700' },
+  hubChip: { backgroundColor: '#f8fafc', padding: 12, borderRadius: 12, marginRight: 10, borderWidth: 1, borderColor: '#e2e8f0', minWidth: 120, alignItems: 'center' },
+  hubChipActive: { backgroundColor: '#f59e0b', borderColor: '#d97706' },
+  hubChipIcon: { fontSize: 24, marginBottom: 4 },
+  hubChipName: { fontSize: 13, fontWeight: '600', color: '#475569', textAlign: 'center' },
+  hubChipNameActive: { color: '#fff', fontWeight: '800' },
+  hubChipCity: { fontSize: 11, color: '#94a3b8', marginTop: 2, textAlign: 'center' },
+  hubChipCityActive: { color: '#fde68a' }
 });
