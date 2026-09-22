@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { ApiClient } from '../../infrastructure/api/ApiClient';
 
-type Role = 'customer' | 'hub_staff' | 'hub_manager' | 'tailor' | 'rider' | 'admin' | null;
+type Role = 'customer' | 'hub_staff' | 'hub_manager' | 'tailor' | 'rider' | 'admin' | 'super_admin' | null;
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -11,7 +12,7 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  login: (role: Role, userId: string, userName: string, hubId?: string) => void;
+  login: (identifier: string, password?: string) => Promise<void>;
   logout: () => void;
   setHubId: (hubId: string) => void;
 }
@@ -28,11 +29,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     hubId: null,
   });
 
-  const login = (role: Role, userId: string, userName: string, hubId?: string) => {
-    setState({ isAuthenticated: true, role, userId, userName, hubId: hubId || 'h1' });
+  useEffect(() => {
+    // Check for existing token on mount
+    const loadSession = async () => {
+      const token = await ApiClient.getToken();
+      if (token) {
+        try {
+          const user = await ApiClient.getMe();
+          setState({
+            isAuthenticated: true,
+            role: user.role?.toLowerCase() as Role,
+            userId: user.id || user.user_id,
+            userName: user.name || user.phone,
+            hubId: user.hubId || null
+          });
+        } catch (e) {
+          // Token invalid or expired
+          await ApiClient.clearToken();
+        }
+      }
+    };
+    loadSession();
+  }, []);
+
+  const login = async (identifier: string, password = 'test') => {
+    const data = await ApiClient.login(identifier, password);
+    // Fetch profile
+    const user = await ApiClient.getMe();
+    setState({ 
+      isAuthenticated: true, 
+      role: user.role?.toLowerCase() as Role || 'customer', 
+      userId: user.id || user.user_id, 
+      userName: user.name || user.phone || user.email, 
+      hubId: user.hubId || null 
+    });
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await ApiClient.clearToken();
     setState({ isAuthenticated: false, role: null, userId: null, userName: null, hubId: null });
   };
 

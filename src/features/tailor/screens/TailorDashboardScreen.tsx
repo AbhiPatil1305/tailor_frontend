@@ -3,15 +3,29 @@ import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
   Alert, SafeAreaView, Modal, TextInput, Platform
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../../core/auth/AuthContext';
+import { ApiClient as MockApi } from '../../../infrastructure/api/ApiClient';
+import { Garment, Tailor, PayoutLedger } from '../../../domain/models/types';
+import { UserProfileModal } from '../../../shared/components/UserProfileModal';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { useAuth } from '../../../core/auth/AuthContext';
-import { MockApi } from '../../../infrastructure/api/MockApi';
-import { Garment, Tailor, PayoutLedger } from '../../../domain/models/types';
 
 export const TailorDashboardScreen = () => {
   const { logout, userName, userId } = useAuth();
+
+  const confirmLogout = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to logout?')) logout();
+    } else {
+      Alert.alert('Logout', 'Are you sure you want to logout?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', onPress: logout, style: 'destructive' },
+      ]);
+    }
+  };
   const tailorId = userId || 't1';
+  const [showProfile, setShowProfile] = useState(false);
 
   const [garments, setGarments] = useState<Garment[]>([]);
   const [tailor, setTailor] = useState<Tailor | null>(null);
@@ -175,10 +189,16 @@ export const TailorDashboardScreen = () => {
           <Text style={styles.headerRole}>Tailor Partner</Text>
           <Text style={styles.headerName}>{userName || tailor.name}</Text>
         </View>
-        <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity style={[styles.logoutBtn, { marginRight: 8 }]} onPress={() => setShowProfile(true)}>
+            <Ionicons name="person-outline" size={24} color="#475569" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.logoutBtn} onPress={confirmLogout}>
+            <Ionicons name="log-out-outline" size={24} color="#475569" />
+          </TouchableOpacity>
+        </View>
       </View>
+      <UserProfileModal visible={showProfile} onClose={() => setShowProfile(false)} />
 
       {/* Tabs */}
       <View style={styles.tabBar}>
@@ -421,8 +441,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
   headerRole: { fontSize: 13, color: '#f59e0b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   headerName: { fontSize: 20, fontWeight: '800', color: '#1e293b', marginTop: 2 },
-  logoutBtn: { backgroundColor: '#f1f5f9', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  logoutText: { color: '#475569', fontWeight: '700', fontSize: 14 },
+  logoutBtn: { padding: 4 },
 
   tabBar: { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   tab: { flex: 1, paddingVertical: 14, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },

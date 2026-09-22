@@ -1,15 +1,29 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  Alert, SafeAreaView, TextInput, Modal
+  Alert, SafeAreaView, TextInput, Modal, Platform
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../core/auth/AuthContext';
-import { MockApi } from '../../../infrastructure/api/MockApi';
+import { ApiClient as MockApi } from '../../../infrastructure/api/ApiClient';
 import { PayoutClaim, Hub, PayoutLedger } from '../../../domain/models/types';
+import { UserProfileModal } from '../../../shared/components/UserProfileModal';
 
 export const AdminFinanceScreen = () => {
   const { logout, userName } = useAuth();
+
+  const confirmLogout = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to logout?')) logout();
+    } else {
+      Alert.alert('Logout', 'Are you sure you want to logout?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', onPress: logout, style: 'destructive' },
+      ]);
+    }
+  };
   const [claims, setClaims] = useState<PayoutClaim[]>([]);
+  const [showProfile, setShowProfile] = useState(false);
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [ledger, setLedger] = useState<PayoutLedger[]>([]);
   const [dashboard, setDashboard] = useState<any>(null);
@@ -69,10 +83,16 @@ export const AdminFinanceScreen = () => {
           <Text style={styles.headerRole}>Finance & Admin</Text>
           <Text style={styles.headerName}>{userName}</Text>
         </View>
-        <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity style={[styles.logoutBtn, { marginRight: 8 }]} onPress={() => setShowProfile(true)}>
+            <Ionicons name="person-outline" size={24} color="#475569" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.logoutBtn} onPress={confirmLogout}>
+            <Ionicons name="log-out-outline" size={24} color="#475569" />
+          </TouchableOpacity>
+        </View>
       </View>
+      <UserProfileModal visible={showProfile} onClose={() => setShowProfile(false)} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
 
@@ -205,8 +225,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
   headerRole: { fontSize: 13, color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   headerName: { fontSize: 20, fontWeight: '800', color: '#1e293b', marginTop: 2 },
-  logoutBtn: { backgroundColor: '#f1f5f9', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  logoutText: { color: '#475569', fontWeight: '700', fontSize: 14 },
+  logoutBtn: { padding: 4 },
 
   scrollContent: { flexGrow: 1, padding: 16, paddingBottom: 60 },
 

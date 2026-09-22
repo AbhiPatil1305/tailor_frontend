@@ -89,7 +89,8 @@ export interface Garment {
   hubId: string;
   type: string;
   gender: GenderCategory;
-  measurements?: GarmentMeasurements;
+  measurements?: GarmentMeasurements | any;
+  measurementsConfirmed?: boolean;
   notes?: string;
   serviceCharge: number;
   payoutAmount: number;
@@ -100,6 +101,7 @@ export interface Garment {
   // SLA
   intakeTime?: string;        // ISO — set on INTAKE event
   slaDeadline?: string;       // intakeTime + 24h
+  codCollected?: boolean;     // true once COD collected on delivery
   createdAt: string;
 }
 

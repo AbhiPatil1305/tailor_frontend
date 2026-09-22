@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Alert, TextInput } from 'react-native';
 import { useAuth } from '../../../core/auth/AuthContext';
-import { MockApi } from '../../../infrastructure/api/MockApi';
+import { ApiClient as MockApi } from '../../../infrastructure/api/ApiClient';
 
 // ── Demo accounts (Priority 5) ──────────────────────────────────────────────
 const DEMO_ACCOUNTS = [
@@ -36,35 +36,52 @@ const DEMO_ACCOUNTS = [
 
 export const LoginScreen = () => {
   const { login } = useAuth();
-  const [resetting, setResetting] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [isSignup, setIsSignup] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleReset = async () => {
-    Alert.alert(
-      '🔄 Reset Demo Data',
-      'This restores all garments, tailors, orders, and events to the original demo state.\n\nUseful before a judge presentation.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset Now',
-          style: 'destructive',
-          onPress: () => {
-            setResetting(true);
-            setTimeout(() => {
-              MockApi.resetDemo();
-              setResetting(false);
-              Alert.alert('✅ Demo Reset', 'All data restored to the demo scenario. You can now run the full 2-minute walkthrough.');
-            }, 400);
-          },
-        },
-      ]
-    );
+  const handleRealSubmit = async () => {
+    if (!phone) return;
+    setLoading(true);
+    
+    // The backend strictly expects 10-15 digits with no spaces or dashes
+    const cleanPhone = phone.replace(/\D/g, '');
+
+    try {
+      if (isSignup) {
+        if (!name || name.length < 2) {
+          Alert.alert('Error', 'Name must be at least 2 characters');
+          setLoading(false);
+          return;
+        }
+        if (cleanPhone.length < 10) {
+          Alert.alert('Error', 'Phone must be at least 10 digits');
+          setLoading(false);
+          return;
+        }
+        if (email && !email.includes('@')) {
+          Alert.alert('Error', 'Please enter a valid email address');
+          setLoading(false);
+          return;
+        }
+        await MockApi.register(name, cleanPhone, password || 'test1234', email || undefined);
+      }
+      await login(cleanPhone, password || 'test1234');
+    } catch (e: any) {
+      Alert.alert(isSignup ? 'Sign Up Failed' : 'Login Failed', e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <View style={styles.container}>
 
-        {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoCircle}>
             <Text style={styles.logoIcon}>✂️</Text>
@@ -74,57 +91,125 @@ export const LoginScreen = () => {
           <Text style={styles.tagline}>Book it. Tag it. Stitch it. Pay it.</Text>
         </View>
 
-        {/* Demo Reset — Dev only */}
-        <TouchableOpacity
-          style={[styles.resetBtn, resetting && styles.resetBtnDisabled]}
-          onPress={handleReset}
-          disabled={resetting}
-        >
-          <Text style={styles.resetIcon}>🔄</Text>
-          <Text style={styles.resetText}>{resetting ? 'Resetting...' : 'Reset Demo Data'}</Text>
-        </TouchableOpacity>
-
-        {/* Role cards */}
-        {DEMO_ACCOUNTS.map(section => (
-          <View key={section.section} style={styles.section}>
-            <Text style={styles.sectionTitle}>{section.section}</Text>
-            {section.roles.map(r => (
-              <TouchableOpacity
-                key={r.id + r.role}
-                style={[styles.roleCard, { borderLeftColor: r.color }]}
-                onPress={() => login(r.role, r.id, r.name)}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.iconBox, { backgroundColor: r.color + '20' }]}>
-                  <Text style={styles.iconText}>{r.icon}</Text>
-                </View>
-                <View style={styles.roleTextContainer}>
-                  <Text style={styles.roleTitle}>{r.title}</Text>
-                  <Text style={styles.roleEmail}>{r.email}</Text>
-                </View>
-                <Text style={styles.chevron}>›</Text>
-              </TouchableOpacity>
-            ))}
+        {/* Real Login/Signup Form */}
+        <View style={styles.loginForm}>
+          <Text style={styles.sectionTitle}>{isSignup ? 'Sign Up' : 'Login'}</Text>
+          {isSignup && (
+            <View>
+              <Text style={styles.inputLabel}>Full Name</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ravi Kumar"
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+              />
+              <Text style={styles.inputLabel}>Email (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="ravi@example.com"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+          )}
+          <View>
+            <Text style={styles.inputLabel}>Mobile Number</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 9000000001"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              autoCapitalize="none"
+            />
           </View>
-        ))}
-
-        {/* Refresh warning */}
-        <View style={styles.warningBox}>
-          <Text style={styles.warningIcon}>⚠️</Text>
-          <Text style={styles.warningText}>
-            This is an in-memory demo. Refreshing the browser will clear live session actions.
-            Use <Text style={{ fontWeight: '700' }}>Reset Demo Data</Text> before each presentation.
-          </Text>
+          <View>
+            <Text style={styles.inputLabel}>Password</Text>
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="••••••••"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+              />
+              <TouchableOpacity 
+                style={styles.eyeBtn}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '👁️‍🗨️'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          <TouchableOpacity 
+            style={styles.primaryBtn} 
+            onPress={handleRealSubmit}
+            disabled={loading}
+          >
+            <Text style={styles.primaryBtnText}>{loading ? 'Processing...' : (isSignup ? 'Create Account' : 'Login')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.toggleBtn} 
+            onPress={() => setIsSignup(!isSignup)}
+          >
+            <Text style={styles.toggleBtnText}>
+              {isSignup ? 'Already have an account? Login' : "Don't have an account? Sign Up"}
+            </Text>
+          </TouchableOpacity>
         </View>
 
-      </ScrollView>
+        {/* Demo Roles - Legacy mapping */}
+        <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={true}>
+          {DEMO_ACCOUNTS.map(section => (
+            <View key={section.section} style={styles.section}>
+              <Text style={styles.sectionTitle}>{section.section} (Demo)</Text>
+              {section.roles.map(r => (
+                <TouchableOpacity
+                  key={r.id + r.role}
+                  style={[styles.roleCard, { borderLeftColor: r.color }]}
+                  onPress={() => {
+                    // Try to map demo emails to some default phone for now
+                    let demoPhone = '9000000001';
+                    if (r.role === 'hub_manager') demoPhone = '9000000002';
+                    else if (r.role === 'tailor') demoPhone = '9000000003';
+                    login(demoPhone, 'test').catch(e => Alert.alert('Login Failed', e.message));
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.iconBox, { backgroundColor: r.color + '20' }]}>
+                    <Text style={styles.iconText}>{r.icon}</Text>
+                  </View>
+                  <View style={styles.roleTextContainer}>
+                    <Text style={styles.roleTitle}>{r.title}</Text>
+                    <Text style={styles.roleEmail}>{r.email}</Text>
+                  </View>
+                  <Text style={styles.chevron}>›</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ))}
+
+          {/* Refresh warning */}
+          <View style={styles.warningBox}>
+            <Text style={styles.warningIcon}>⚠️</Text>
+            <Text style={styles.warningText}>
+              This is an in-memory demo. Refreshing the browser will clear live session actions.
+              Use <Text style={{ fontWeight: '700' }}>Reset Demo Data</Text> before each presentation.
+            </Text>
+          </View>
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#f8fafc' },
-  container: { flexGrow: 1, padding: 24, paddingBottom: 60, alignItems: 'center' },
+  container: { flex: 1, paddingTop: 24, paddingHorizontal: 24, alignItems: 'center' },
+  scrollContent: { paddingBottom: 60, alignItems: 'center' },
 
   header: { alignItems: 'center', marginTop: 40, marginBottom: 28 },
   logoCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#1e293b', justifyContent: 'center', alignItems: 'center', marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
@@ -134,13 +219,19 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 16, color: '#64748b', marginTop: 8, fontWeight: '500' },
   tagline: { fontSize: 13, color: '#94a3b8', marginTop: 4, fontStyle: 'italic' },
 
-  resetBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fef3c7', borderWidth: 1.5, borderColor: '#f59e0b', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20, marginBottom: 28, width: '100%', maxWidth: 500, gap: 8 },
-  resetBtnDisabled: { opacity: 0.5 },
-  resetIcon: { fontSize: 18 },
-  resetText: { fontSize: 15, fontWeight: '700', color: '#92400e' },
-
   section: { width: '100%', maxWidth: 500, marginBottom: 24 },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10, marginLeft: 4 },
+  loginForm: { width: '100%', maxWidth: 500, marginBottom: 24 },
+  inputLabel: { fontSize: 12, fontWeight: '700', color: '#64748b', marginBottom: 6, marginLeft: 4, textTransform: 'uppercase' },
+  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, padding: 14, fontSize: 16, marginBottom: 16 },
+  passwordContainer: { flexDirection: 'row', backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, marginBottom: 16, alignItems: 'center' },
+  passwordInput: { flex: 1, padding: 14, fontSize: 16 },
+  eyeBtn: { padding: 14 },
+  eyeIcon: { fontSize: 18 },
+  primaryBtn: { backgroundColor: '#1e293b', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 8 },
+  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  toggleBtn: { paddingVertical: 8, alignItems: 'center' },
+  toggleBtnText: { color: '#3b82f6', fontSize: 14, fontWeight: '600' },
 
   roleCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 14, padding: 16, marginBottom: 10, borderLeftWidth: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
   iconBox: { width: 46, height: 46, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 14 },

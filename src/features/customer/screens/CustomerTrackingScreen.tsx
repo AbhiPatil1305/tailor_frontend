@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, SafeAreaView, ScrollView, TextInput } from 'react-native';
-import { MockApi } from '../../../infrastructure/api/MockApi';
+import { ApiClient } from '../../../infrastructure/api/ApiClient';
 import { Order, Garment } from '../../../domain/models/types';
 import { SLAIndicator } from '../../../shared/components/SLAIndicator';
 import { EmptyState } from '../../../shared/components/EmptyState';
@@ -16,21 +16,22 @@ const STAGE_LABELS: Record<string, string> = {
 interface Props { selectedRef?: string; }
 
 export const CustomerTrackingScreen = ({ selectedRef }: Props) => {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [selectedOrderTracking, setSelectedOrderTracking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [clarificationData, setClarificationData] = useState<Record<string, Record<string, string>>>({});
 
   const submitClarification = async (garment: Garment) => {
     const data = clarificationData[garment.id];
     if (!data || Object.keys(data).length === 0) return;
-    await MockApi.submitClarification(garment.id, data, 'c1');
+    // TODO: integrate with real API clarification endpoint
+    console.log('Submitting clarification for garment', garment.id, data);
     
     // refresh
-    const updatedOrders = await MockApi.getOrders();
-    const myOrders = updatedOrders.filter((o: Order) => o.customerId === 'c1').reverse();
+    const updatedOrders = await ApiClient.getMyOrders();
+    const myOrders = updatedOrders.reverse();
     setOrders(myOrders);
-    setSelectedOrder(myOrders.find(o => o.id === selectedOrder?.id) || null);
+    setSelectedOrderTracking(null);
     setClarificationData(prev => {
       const next = {...prev};
       delete next[garment.id];
@@ -47,22 +48,33 @@ export const CustomerTrackingScreen = ({ selectedRef }: Props) => {
 
 
   useEffect(() => {
-    MockApi.getOrders().then((data: Order[]) => {
-      const myOrders = data.filter((o: Order) => o.customerId === 'c1').reverse();
+    ApiClient.getMyOrders().then(async (data: any[]) => {
+      const myOrders = data.reverse();
       setOrders(myOrders);
       if (selectedRef) {
         const found = myOrders.find(o => o.trackingReference === selectedRef);
-        if (found) setSelectedOrder(found);
+        if (found) await handleSelectOrder(found);
       } else if (myOrders.length === 1) {
-        setSelectedOrder(myOrders[0]);
+        await handleSelectOrder(myOrders[0]);
       }
       setLoading(false);
     });
   }, [selectedRef]);
 
+  const handleSelectOrder = async (o: any) => {
+    setLoading(true);
+    try {
+      const tracking = await ApiClient.trackOrder(o.id || o._id);
+      setSelectedOrderTracking(tracking);
+    } catch (e) {
+      console.warn('Failed to load tracking', e);
+    }
+    setLoading(false);
+  };
+
   if (loading) return <LoadingState message="Loading tracking info..." />;
 
-  if (!selectedOrder) {
+  if (!selectedOrderTracking) {
     return (
       <SafeAreaView style={s.safe}>
         <View style={s.header}><Text style={s.title}>Track Order</Text></View>
@@ -71,12 +83,12 @@ export const CustomerTrackingScreen = ({ selectedRef }: Props) => {
         ) : (
           <FlatList
             data={orders}
-            keyExtractor={o => o.id}
+            keyExtractor={o => o.id || o._id}
             contentContainerStyle={s.list}
             ListHeaderComponent={<Text style={s.selectHint}>Select an order to track</Text>}
             renderItem={({ item: o }) => (
-              <TouchableOpacity style={s.orderPill} onPress={() => setSelectedOrder(o)}>
-                <View><Text style={s.pillRef}>{o.trackingReference}</Text><Text style={s.pillMeta}>{o.garments.length} garments · {o.paymentMethod.toUpperCase()}</Text></View>
+              <TouchableOpacity style={s.orderPill} onPress={() => handleSelectOrder(o)}>
+                <View><Text style={s.pillRef}>{o.trackingReference}</Text><Text style={s.pillMeta}>{o.garmentCount || 0} garments · {o.payment?.method?.toUpperCase() || 'COD'}</Text></View>
                 <Text style={s.pillChev}>›</Text>
               </TouchableOpacity>
             )}
@@ -86,20 +98,22 @@ export const CustomerTrackingScreen = ({ selectedRef }: Props) => {
     );
   }
 
-  const overallStageIdx = Math.min(...selectedOrder.garments.map((g: Garment) => STAGE_ORDER.indexOf(g.stage)));
+  const overallStageIdx = selectedOrderTracking.garments.length > 0 
+    ? Math.min(...selectedOrderTracking.garments.map((g: any) => Math.max(0, STAGE_ORDER.indexOf(g.currentStage))))
+    : 0;
 
   return (
     <SafeAreaView style={s.safe}>
       <ScrollView contentContainerStyle={s.trackScroll}>
         <View style={s.trackHeader}>
-          <TouchableOpacity onPress={() => setSelectedOrder(null)} style={s.backBtn}>
+          <TouchableOpacity onPress={() => setSelectedOrderTracking(null)} style={s.backBtn}>
             <Text style={s.backText}>← Orders</Text>
           </TouchableOpacity>
           <View style={s.refBox}>
-            <Text style={s.trackRef}>{selectedOrder.trackingReference}</Text>
-            <Text style={s.trackMeta}>{selectedOrder.garments.length} garments · {selectedOrder.paymentMethod.toUpperCase()}</Text>
+            <Text style={s.trackRef}>{selectedOrderTracking.order.trackingReference}</Text>
+            <Text style={s.trackMeta}>{selectedOrderTracking.garments.length} garments · {selectedOrderTracking.order.payment?.method?.toUpperCase() || 'COD'}</Text>
           </View>
-          {selectedOrder.garments[0]?.slaDeadline && <SLAIndicator slaDeadline={selectedOrder.garments[0].slaDeadline} />}
+          {selectedOrderTracking.garments[0]?.slaDeadline && <SLAIndicator slaDeadline={selectedOrderTracking.garments[0].slaDeadline} />}
         </View>
 
         {/* Overall pipeline */}
@@ -124,16 +138,15 @@ export const CustomerTrackingScreen = ({ selectedRef }: Props) => {
 
         {/* Per-garment breakdown */}
         <Text style={s.sectionTitle}>Garment Details</Text>
-        {selectedOrder.garments.map((g: Garment) => (
-          <View key={g.id} style={s.garmentCard}>
+        {selectedOrderTracking.garments.map((g: any) => (
+          <View key={g.garmentId} style={s.garmentCard}>
             <View style={s.garmentHeader}>
               <Text style={s.garmentType}>{g.type} ({g.gender})</Text>
               <Text style={s.garmentQr}>{g.qrCode}</Text>
             </View>
-            <SLAIndicator slaDeadline={g.slaDeadline} compact />
-
+            <SLAIndicator slaDeadline={g.sla} compact />
             <View style={[s.stagePill, { marginTop: 8 }]}>
-              <Text style={s.stagePillText}>{STAGE_LABELS[g.stage] || g.stage}</Text>
+              <Text style={s.stagePillText}>{STAGE_LABELS[g.currentStage] || g.currentStage || 'Booked'}</Text>
             </View>
 
             {g.measurements?.status === 'NEEDS_CLARIFICATION' && g.measurements.clarificationRequest && (

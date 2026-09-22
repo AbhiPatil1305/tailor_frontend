@@ -1,6 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Platform, Alert } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../core/auth/AuthContext';
+import { UserProfileModal } from '../../../shared/components/UserProfileModal';
 
 interface Props {
   onBookPress: () => void;
@@ -10,6 +12,18 @@ interface Props {
 
 export const CustomerHomeScreen = ({ onBookPress, onTrackPress, onAIPress }: Props) => {
   const { userName, logout } = useAuth();
+  const [showProfile, setShowProfile] = useState(false);
+
+  const confirmLogout = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to logout?')) logout();
+    } else {
+      Alert.alert('Logout', 'Are you sure you want to logout?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', onPress: logout, style: 'destructive' },
+      ]);
+    }
+  };
   return (
     <SafeAreaView style={s.safe}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
@@ -19,9 +33,14 @@ export const CustomerHomeScreen = ({ onBookPress, onTrackPress, onAIPress }: Pro
             <Text style={s.brand}>TAILOR<Text style={s.brandAccent}>24</Text></Text>
             <Text style={s.greeting}>Hi, {userName?.split(' ')[0]} 👋</Text>
           </View>
-          <TouchableOpacity style={s.logoutBtn} onPress={logout}>
-            <Text style={s.logoutText}>Logout</Text>
-          </TouchableOpacity>
+          <View style={s.headerActions}>
+            <TouchableOpacity style={[s.logoutBtn, { marginRight: 8 }]} onPress={() => setShowProfile(true)}>
+              <Ionicons name="person-outline" size={24} color="#475569" />
+            </TouchableOpacity>
+            <TouchableOpacity style={s.logoutBtn} onPress={confirmLogout}>
+              <Ionicons name="log-out-outline" size={24} color="#475569" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Hero */}
@@ -74,6 +93,7 @@ export const CustomerHomeScreen = ({ onBookPress, onTrackPress, onAIPress }: Pro
             </View>
           ))}
         </View>
+        <UserProfileModal visible={showProfile} onClose={() => setShowProfile(false)} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -86,8 +106,8 @@ const s = StyleSheet.create({
   brand: { fontSize: 22, fontWeight: '900', color: '#1e293b' },
   brandAccent: { color: '#f59e0b' },
   greeting: { fontSize: 14, color: '#64748b', marginTop: 2 },
-  logoutBtn: { backgroundColor: '#f1f5f9', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
-  logoutText: { color: '#475569', fontWeight: '700', fontSize: 13 },
+  headerActions: { flexDirection: 'row', alignItems: 'center' },
+  logoutBtn: { padding: 4 },
   hero: { backgroundColor: '#1e293b', borderRadius: 20, padding: 28, marginBottom: 16, alignItems: 'flex-start' },
   heroEmoji: { fontSize: 36, marginBottom: 12 },
   heroTitle: { fontSize: 24, fontWeight: '900', color: '#fff', lineHeight: 32, marginBottom: 10 },

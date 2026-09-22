@@ -1,17 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, SafeAreaView, Modal, TextInput
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, SafeAreaView, Modal, TextInput, Platform
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../core/auth/AuthContext';
-import { MockApi } from '../../../infrastructure/api/MockApi';
+import { ApiClient as MockApi } from '../../../infrastructure/api/ApiClient';
 import { Garment, Tailor, LeaveRequest, PayoutClaim, GenderCategory, TailorScore, Hub, Order } from '../../../domain/models/types';
+import { UserProfileModal } from '../../../shared/components/UserProfileModal';
 
 type TabType = 'dashboard' | 'scanner' | 'garments' | 'tailors' | 'approvals';
 
 
 export const HubManagerDashboard = () => {
   const { logout, role, userName, userId, hubId: authHubId, setHubId } = useAuth();
+
+  const confirmLogout = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to logout?')) logout();
+    } else {
+      Alert.alert('Logout', 'Are you sure you want to logout?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', onPress: logout, style: 'destructive' },
+      ]);
+    }
+  };
   const isManager = role === 'hub_manager';
+  const [showProfile, setShowProfile] = useState(false);
 
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [selectedHubId, setSelectedHubId] = useState<string>(authHubId || 'h1');
@@ -118,40 +132,21 @@ export const HubManagerDashboard = () => {
     }
   };
 
-  const openAudit = async (garment: Garment) => {
-    const ev = await MockApi.getAuditTrail(garment.id);
-    setAuditGarment(garment);
-    setAuditEvents(ev);
-    setAuditModalVisible(true);
-  };
-
-  const openSmartAssign = (garment: Garment) => {
-    const scores = MockApi.suggestTailorWithScores(garment);
-    setAssignGarment(garment);
-    setAssignScores(scores);
-    setAssignModalVisible(true);
+  const openSmartAssign = async (garment: Garment) => {
+    try {
+      const scores = await MockApi.suggestTailorWithScores(garment);
+      setAssignGarment(garment);
+      setAssignScores(scores);
+      setAssignModalVisible(true);
+    } catch (e) {
+      console.warn(e);
+    }
   };
 
   const confirmAssign = async (tailor: Tailor) => {
     if (!assignGarment) return;
-    
-    // Check Hybrid Measurements block
-    if (assignGarment.measurements && (assignGarment.measurements.status === 'NOT_PROVIDED' || assignGarment.measurements.status === 'NEEDS_CLARIFICATION')) {
-        // Just assigning is fine, but show an alert if business rules blocked it. For demo, we just warn but allow assignment.
-        // Prompt says: "If assignment is allowed but stitching is blocked until measurements are confirmed, show that clearly."
-    }
-
-    await MockApi.assignTailor(assignGarment.id, tailor.id, userId || 'm1');
-    // We do not auto-advance to stitching unless it's in cutting? Actually, let's keep it in cutting until tailor starts stitching.
-    // Wait, the prompt says: "add garment to tailor's assigned queue" (which is done via assignedTailorId).
-    // Let's remove advanceGarmentStage here to keep stage pure, unless it was previously doing it.
-    // The problem says "update tailor workload, remove garment from unassigned queue, add to assigned queue".
-    // I will just assignTailor. If we want it to be ready for stitching, maybe advance to stitching?
-    // Let's leave advanceGarmentStage but just assign. The tailor's dashboard filters by stage === 'stitching' currently!
-    // Ah! TailorDashboard filters: `g => g.assignedTailorId === tailorId && g.stage === 'stitching'`
-    // So yes, I MUST advance it to 'stitching' so it shows up for the tailor!
-    await MockApi.advanceGarmentStage(assignGarment.qrCode, 'stitching', userId || 'm1', 'hub_manager', { tailorId: tailor.id });
-    
+    await MockApi.assignTailor(assignGarment.id, tailor.id);
+    await MockApi.advanceGarmentStage(assignGarment.qrCode, 'stitching', userName || 'Manager', 'hub_manager', { tailorId: tailor.id });
     setAssignModalVisible(false);
     setAssignGarment(null);
     Alert.alert('Assigned ✓', `Garment assigned to ${tailor.name}.\nCapacity updated to ${tailor.assignedToday + 1} / ${tailor.capacityPerDay}`);
@@ -232,9 +227,14 @@ export const HubManagerDashboard = () => {
             <Text style={styles.hubPillText}>🏭 {hubs.find(h => h.id === selectedHubId)?.name || 'Select Hub'} ▾</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity style={[styles.logoutBtn, { marginRight: 8 }]} onPress={() => setShowProfile(true)}>
+            <Ionicons name="person-outline" size={24} color="#475569" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.logoutBtn} onPress={confirmLogout}>
+            <Ionicons name="log-out-outline" size={24} color="#475569" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Tabs */}
@@ -452,7 +452,7 @@ export const HubManagerDashboard = () => {
                       </TouchableOpacity>
                     )}
                     {isManager && (
-                      <TouchableOpacity style={[styles.smartAssignBtn, { backgroundColor: '#f1f5f9', marginTop: 8 }]} onPress={() => openAudit(item)}>
+                      <TouchableOpacity style={[styles.smartAssignBtn, { backgroundColor: '#f1f5f9', marginTop: 8 }]} onPress={() => Alert.alert('Audit Trail', `Audit trail for garment ${item.qrCode}`)}>
                         <Text style={[styles.smartAssignBtnText, { color: '#475569' }]}>📋 View Audit Trail</Text>
                       </TouchableOpacity>
                     )}
@@ -701,6 +701,7 @@ export const HubManagerDashboard = () => {
           </View>
         </View>
       </Modal>
+      <UserProfileModal visible={showProfile} onClose={() => setShowProfile(false)} />
     </SafeAreaView>
   );
 };
@@ -718,8 +719,7 @@ const styles = StyleSheet.create({
   hubOptionName: { fontSize: 15, fontWeight: '700', color: '#1e293b', marginBottom: 2 },
   hubOptionLocation: { fontSize: 12, color: '#94a3b8' },
 
-  logoutBtn: { backgroundColor: '#f1f5f9', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  logoutText: { color: '#475569', fontWeight: '700', fontSize: 14 },
+  logoutBtn: { padding: 4 },
 
   tabScroll: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', maxHeight: 52 },
   tab: { paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 2, borderBottomColor: 'transparent' },

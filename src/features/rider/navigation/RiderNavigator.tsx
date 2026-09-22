@@ -1,6 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, SafeAreaView, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { RiderDeliveryScreen } from '../screens/RiderDeliveryScreen';
 import { useAuth } from '../../../core/auth/AuthContext';
 
@@ -14,9 +15,26 @@ const TabIcon = ({ icon, label, focused }: { icon: string; label: string; focuse
 );
 
 const RiderHomeTab = () => {
-  const { userName } = useAuth();
+  const { userName, logout } = useAuth();
+  const confirmLogout = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to logout?')) logout();
+    } else {
+      Alert.alert('Logout', 'Are you sure you want to logout?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', onPress: logout, style: 'destructive' },
+      ]);
+    }
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e2e8f0', backgroundColor: '#fff' }}>
+        <Text style={{ fontSize: 18, fontWeight: '900', color: '#1e293b', letterSpacing: 1 }}>RIDER24</Text>
+        <TouchableOpacity onPress={confirmLogout} style={{ padding: 8 }}>
+          <Ionicons name="log-out-outline" size={24} color="#64748b" />
+        </TouchableOpacity>
+      </View>
       <ScrollView contentContainerStyle={{ padding: 20 }}>
         <View style={{ backgroundColor: '#1e293b', borderRadius: 20, padding: 24, marginBottom: 20 }}>
           <Text style={{ color: '#f59e0b', fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Logistics Rider</Text>
@@ -30,6 +48,17 @@ const RiderHomeTab = () => {
 
 const ProfileTab = () => {
   const { logout, userName } = useAuth();
+
+  const confirmLogout = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to logout?')) logout();
+    } else {
+      Alert.alert('Logout', 'Are you sure you want to logout?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Logout', onPress: logout, style: 'destructive' },
+      ]);
+    }
+  };
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
       <ScrollView contentContainerStyle={{ padding: 24 }}>
@@ -38,8 +67,8 @@ const ProfileTab = () => {
           <Text style={{ color: '#fff', fontSize: 20, fontWeight: '900', marginBottom: 4 }}>{userName}</Text>
           <Text style={{ color: '#f59e0b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Logistics Rider</Text>
         </View>
-        <TouchableOpacity onPress={logout} style={{ backgroundColor: '#fee2e2', borderRadius: 14, paddingVertical: 16, alignItems: 'center' }}>
-          <Text style={{ color: '#dc2626', fontWeight: '800', fontSize: 15 }}>Logout</Text>
+        <TouchableOpacity onPress={confirmLogout} style={{ backgroundColor: '#fee2e2', borderRadius: 14, paddingVertical: 16, alignItems: 'center' }}>
+          <Ionicons name="log-out-outline" size={24} color="#dc2626" />
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
