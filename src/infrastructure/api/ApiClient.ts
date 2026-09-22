@@ -387,6 +387,16 @@ export const ApiClient = {
     return res.ok;
   },
 
+  async assignWorkerToGarment(garmentId: string, workerId: string, workerName: string): Promise<any> {
+    const res = await this.fetchWithAuth(`/assignments/garments/${garmentId}/assign-worker`, {
+      method: 'POST',
+      body: JSON.stringify({ workerId, workerName }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || json.detail || 'Assignment failed');
+    return json.data || json;
+  },
+
   // ─── Leave Requests ───────────────────────────────────────────────────────
   async getLeaveRequests(hubId?: string): Promise<LeaveRequest[]> {
     try {
